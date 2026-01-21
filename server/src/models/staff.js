@@ -5,9 +5,10 @@ const staffSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    address: {
-        type: String,
+    hourlyRate: {
+        type: Number,
         required: true,
+        default: 8.00
     },
     active : {
         type: Boolean,

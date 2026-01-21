@@ -1,9 +1,14 @@
 import mongoose from 'mongoose';
 
 const shiftSchema = new mongoose.Schema({
-    shiftManager: {
+    shiftManagerId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Staff',
+        required: true
+    },
+    staffId:{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Staff',
         required: true
     },
     startTime: {
