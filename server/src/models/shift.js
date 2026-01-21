@@ -1,12 +1,7 @@
 import mongoose from 'mongoose';
 
 const shiftSchema = new mongoose.Schema({
-    shiftManagerId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Staff',
-        required: true
-    },
-    staffId:{
+    managerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Staff',
         required: true
@@ -23,10 +18,6 @@ const shiftSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Event',
         required: true
-    },
-    breakMinutes: {
-        type: Number,
-        default: 0
     },
     confirmed: {
         type: Boolean,

@@ -5,14 +5,24 @@ const eventSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    description: {
+        type: String,
+        required: false
+    },
+    date: {
+        type: Date,
+        required: true
+    },
     address: {
         type: String,
         required: false,
     },
-    active: {
-        type: Boolean,
-        default: false
-    }
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+//  status: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'pending' }
 }, {timestamps: true }
 );
 

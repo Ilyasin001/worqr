@@ -1,6 +1,14 @@
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema({
+    name : {
+        type: String,
+        required: true
+    },
+    address: {
+        type: String,
+        required: false
+    },
     email: {
         type: String,
         required: true,
@@ -15,9 +23,10 @@ const userSchema = new mongoose.Schema({
         enum: ["staff", "admin"],
         default: "staff"
     },
-    staffId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Staff"
+    hourlyRate: {
+        type: Number,
+        required: false,
+        default: 8.00
     }
 }, {timestamps: true }
 );
