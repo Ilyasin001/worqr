@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import cors from "cors";
 
+import userRoutes from "./routes/userRoutes.js";
 
 dotenv.config();
 
@@ -18,6 +19,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Import routes
+
+app.use("/api/users", userRoutes);
 
 // Testing route
 app.get("/", (req, res) => {

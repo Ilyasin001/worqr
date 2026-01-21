@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
     },
     address: {
         type: String,
-        required: false
+        default: ""
     },
     email: {
         type: String,
@@ -28,9 +28,8 @@ const userSchema = new mongoose.Schema({
         required: false,
         default: 8.00
     }
-}, {timestamps: true }
-);
+}, { timestamps: true });
 
 const User = mongoose.model("User", userSchema);
 
-export default Note;
+export default User;

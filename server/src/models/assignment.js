@@ -20,6 +20,9 @@ const assignmentSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    // confirmed :{ type: Boolean, default: false } // future use
+    // startTime: { type: DATETIME }, // future use
+    // endTime: { type: DATETIME } // future use
 }, { timestamps: true });
 
 const Assignment = mongoose.model("Assignment", assignmentSchema);
