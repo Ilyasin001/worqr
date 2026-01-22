@@ -4,6 +4,7 @@ import { connectDB } from "./config/db.js";
 import cors from "cors";
 
 import userRoutes from "./routes/userRoutes.js";
+import shiftRoutes from "./routes/shiftRoutes.js";
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.use(cors({
 // Import routes
 
 app.use("/api/users", userRoutes);
+app.use("/api/shifts", shiftRoutes);
 
 // Testing route
 app.get("/", (req, res) => {
