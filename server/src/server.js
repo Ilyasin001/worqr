@@ -5,11 +5,13 @@ import cors from "cors";
 
 import userRoutes from "./routes/userRoutes.js";
 import shiftRoutes from "./routes/shiftRoutes.js";
+import eventRoutes from "./routes/eventRoutes.js";
+import assignmentRoutes from "./routes/assignmentRoutes.js";
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT  || 3001;
 
 connectDB();
 // Core middleware
@@ -24,6 +26,8 @@ app.use(cors({
 
 app.use("/api/users", userRoutes);
 app.use("/api/shifts", shiftRoutes);
+app.use("/api/event", eventRoutes);
+app.use("/api/assignment", assignmentRoutes);
 
 // Testing route
 app.get("/", (req, res) => {
