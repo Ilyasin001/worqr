@@ -2,13 +2,13 @@ import User from "../models/user.js";
 
 export const createUser = async (req, res) => {
     try {
-            const { name, address, email, passwordHash, role, hourlyRate } = req.body;
-            const newUser = new User({ name, address, email, passwordHash, role, hourlyRate });
-            const savedUser = await newUser.save();
-            res.status(201).json(savedUser);
-        } catch (error) {
+        const { name, address, email, passwordHash, role, hourlyRate } = req.body;
+        const newUser = new User({ name, address, email, passwordHash, role, hourlyRate });
+        const savedUser = await newUser.save();
+        res.status(201).json(savedUser);
+    } catch (error) {
             res.status(400).json({ message: error.message });
-        }
+    }
 };
 
 export const getUsers = async (req, res) => {
