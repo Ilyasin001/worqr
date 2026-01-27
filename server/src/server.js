@@ -6,7 +6,7 @@ import cors from "cors";
 import userRoutes from "./routes/userRoutes.js";
 import shiftRoutes from "./routes/shiftRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
-import assignmentRoutes from "./routes/sessionRoute.js";
+import assignmentRoutes from "./routes/assignmentRoute.js";
 
 dotenv.config();
 
@@ -26,8 +26,8 @@ app.use(cors({
 
 app.use("/api/users", userRoutes);
 app.use("/api/shifts", shiftRoutes);
-app.use("/api/event", eventRoutes);
-app.use("/api/assignment", assignmentRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/assignments", assignmentRoutes);
 
 // Testing route
 app.get("/", (req, res) => {
