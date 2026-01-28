@@ -4,10 +4,13 @@ import { protect, adminOnly } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/", protect, adminOnly, createShift);
-router.get("/", protect, adminOnly, getShifts);
+router.use(protect);
+router.use(adminOnly);
+
+router.post("/", createShift);
+router.get("/", getShifts);
 router.get("/:id", getShiftById);
-router.put("/:id", protect, adminOnly, updateShift);
-router.delete("/:id", protect, adminOnly, deleteShift);
+router.put("/:id", updateShift);
+router.delete("/:id", deleteShift);
 
 export default router;
