@@ -7,6 +7,7 @@ import userRoutes from "./routes/userRoutes.js";
 import shiftRoutes from "./routes/shiftRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import assignmentRoutes from "./routes/assignmentRoute.js";
+import authRoutes from "./routes/authRoutes.js";
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/shifts", shiftRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/assignments", assignmentRoutes);
+app.use("/api/auth", authRoutes);
 
 // Testing route
 app.get("/", (req, res) => {

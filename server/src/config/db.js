@@ -9,3 +9,5 @@ export const connectDB = async () => {
         process.exit(1); // exit with failure
     }
 }
+
+export default connectDB;
