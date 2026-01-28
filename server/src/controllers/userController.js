@@ -1,9 +1,12 @@
 import User from "../models/user.js";
+import bcrypt from "bcrypt";
 
 export const createUser = async (req, res) => {
     try {
         const { name, address, email, passwordHash, role, hourlyRate } = req.body;
         const newUser = new User({ name, address, email, passwordHash, role, hourlyRate });
+        newUser.passwordHash = await bcrypt.hash(newUser.passwordHash, 10);
+        if (role == "admin") {  newUser.hourlyRate = 10.00; }
         const savedUser = await newUser.save();
         res.status(201).json(savedUser);
     } catch (error) {
