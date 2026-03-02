@@ -11,19 +11,24 @@ const assignmentSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
-    breakDuration: {
+    breakDuration: { // in minutes
         type: Number,
-        default: 0
+        default: 0,
+        min: 0
     },
     actualStartTime: {
         type: Date,
-        required: true
+        required: false  
     },
     actualEndTime: {
         type: Date,
-        required: true
+        required: false
     },
-    hourlyRate: Number,
+    hourlyRate: {
+        type: Number,
+        required: true,
+        min: 0
+    },
     isPaid: {
         type: Boolean,
         default: false
@@ -35,6 +40,13 @@ assignmentSchema.index(
   { shiftId: 1, staffId: 1 },
   { unique: true }
 );
+
+assignmentSchema.pre('save', function(next) {
+    if (this.actualStartTime && this.actualEndTime && this.actualEndTime <= this.actualStartTime) {
+        next(new Error('Actual end time must be after actual start time'));
+    }
+    next();
+});
 
 const Assignment = mongoose.model("Assignment", assignmentSchema);
 

@@ -22,9 +22,12 @@ const eventSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
-//  status: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'pending' }
-}, {timestamps: true }
-);
+    status: { 
+        type: String, 
+        enum: ['pending', 'confirmed', 'cancelled'], 
+        default: 'pending' 
+    }
+}, { timestamps: true });
 
 const Event = mongoose.model("Event", eventSchema);
 
