@@ -1,16 +1,14 @@
 import express from "express";
 import { createEvent, getEvents, getEventbyId, updateEvent, deleteEvent } from "../controllers/eventController.js";
-import { protect, adminOnly } from "../middleware/authMiddleware.js";
+import { protect, restrictTo } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.use(protect);
-router.use(adminOnly);
-
-router.post("/", createEvent);
 router.get("/", getEvents);
 router.get("/:id", getEventbyId);
-router.put("/:id", updateEvent);
-router.delete("/:id", deleteEvent);
+
+router.post("/", protect, restrictTo('admin'), createEvent);
+router.put("/:id", protect, restrictTo('admin'), updateEvent);
+router.delete("/:id", protect, restrictTo('admin'), deleteEvent);
 
 export default router;
