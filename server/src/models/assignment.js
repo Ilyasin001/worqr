@@ -15,16 +15,26 @@ const assignmentSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
-    startTime: {
+    actualStartTime: {
         type: Date,
         required: true
     },
-    endTime: {
+    actualEndTime: {
         type: Date,
         required: true
     },
-    hourlyRate: Number
+    hourlyRate: Number,
+    isPaid: {
+        type: Boolean,
+        default: false
+    },
+    paidAt: Date,
 }, { timestamps: true });
+
+assignmentSchema.index(
+  { shiftId: 1, staffId: 1 },
+  { unique: true }
+);
 
 const Assignment = mongoose.model("Assignment", assignmentSchema);
 
