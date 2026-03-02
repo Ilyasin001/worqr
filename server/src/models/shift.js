@@ -6,14 +6,6 @@ const shiftSchema = new mongoose.Schema({
         ref: 'Staff',
         required: true
     },
-    startTime: {
-        type: Date,
-        required: true
-    },
-    endTime: {
-        type: Date,
-        required: true
-    },
     eventId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Event',

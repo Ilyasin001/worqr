@@ -11,18 +11,19 @@ const assignmentSchema = new mongoose.Schema({
         ref: 'Staff',
         required: true
     },
-    role: {
-        type: String,
-        enum: ["staff", "manager"],
-        default: "staff"
-    },
     breakDuration: {
         type: Number,
         default: 0
     },
-    // confirmed :{ type: Boolean, default: false } // future use
-    // startTime: { type: DATETIME }, // future use
-    // endTime: { type: DATETIME } // future use
+    startTime: {
+        type: Date,
+        required: true
+    },
+    endTime: {
+        type: Date,
+        required: true
+    },
+    hourlyRate: Number
 }, { timestamps: true });
 
 const Assignment = mongoose.model("Assignment", assignmentSchema);

@@ -12,7 +12,7 @@ import authRoutes from "./routes/authRoutes.js";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT  || 3001;
+const PORT = process.env.PORT || 3001;
 
 connectDB();
 // Core middleware
