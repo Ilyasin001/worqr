@@ -96,3 +96,27 @@ export const finalizePayroll = async (req, res) => {
     }
 };
 
+export const getPayrollBatches = async (req, res) => {
+  try {
+    const { staffId, start, end } = req.query;
+
+    const filter = {};
+
+    if (staffId) {
+      filter.staff = staffId;
+    }
+
+    if (start && end) {
+      filter.periodStart = { $gte: new Date(start) };
+      filter.periodEnd = { $lte: new Date(end) };
+    }
+
+    const batches = await PayrollBatch.find(filter)
+      .populate("staff", "name email role")
+      .sort({ createdAt: -1 });
+
+    res.json(batches);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch payroll history" });
+  }
+};

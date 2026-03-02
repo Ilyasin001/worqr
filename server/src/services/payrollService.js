@@ -8,7 +8,7 @@ export const calculatePayrollPreview = async (userId, periodStart, periodEnd) =>
     actualStartTime: { $ne: null },
     actualEndTime: { $ne: null }
   }).populate({
-  path: "shift",
+  path: "shiftId",
   match: {
     startTime: { $gte: periodStart, $lte: periodEnd }
   }
@@ -17,7 +17,7 @@ export const calculatePayrollPreview = async (userId, periodStart, periodEnd) =>
   let totalHours = 0;
   let totalPay = 0;
 
-  const validAssignments = assignments.filter(a => a.shift);
+  const validAssignments = assignments.filter(a => a.shiftId);
 
   validAssignments.forEach(assign => {
     const start = assign.actualStartTime;

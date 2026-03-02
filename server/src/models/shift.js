@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const shiftSchema = new mongoose.Schema({
     managerId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Staff',
+        ref: 'User',
         required: true
     },
     eventId: {
@@ -14,7 +14,9 @@ const shiftSchema = new mongoose.Schema({
     confirmed: {
         type: Boolean,
         default: false
-    }
+    },
+    startTime: Date,
+    endTime: Date
 }, { timestamps: true });
 
 const Shift = mongoose.model('Shift', shiftSchema);
