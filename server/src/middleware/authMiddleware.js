@@ -1,29 +1,54 @@
 import jwt from "jsonwebtoken";
+import User from "../models/user.js";
 
+// Protect routes - verify JWT token
 export const protect = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  console.log("AUTH HEADER:", authHeader);
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Not authorized" });
-  }
-
   try {
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    let token;
 
-    req.user = decoded; // { userId, role }
+    // Check for Bearer token in headers
+    if (req.headers.authorization?.startsWith('Bearer')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'Not authorized. Please login.' 
+      });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Get user from token
+    req.user = await User.findById(decoded.id).select('-passwordHash');
+    
+    if (!req.user) {
+      return res.status(401).json({ 
+        success: false,
+        message: 'User not found.' 
+      });
+    }
+
     next();
-  } catch (err) {
-    return res.status(401).json({ message: "Token invalid" }) ;
+  } catch (error) {
+    return res.status(401).json({ 
+      success: false,
+      message: 'Not authorized. Invalid token.' 
+    });
   }
 };
 
-export const adminOnly = (req, res, next) => {
-  console.log("REQ USER:", req.user);
-
-  if (req.user.role !== "admin") {
-    return res.status(403).json({ message: "Admins only" });
-  }
-  next();
+// Restrict to specific roles
+export const restrictTo = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'You do not have permission to perform this action.' 
+      });
+    }
+    next();
+  };
 };
