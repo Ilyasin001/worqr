@@ -4,10 +4,13 @@ import { protect, adminOnly } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/", protect, adminOnly, createAssignment);
-router.get("/", protect, adminOnly, getAssignments);
+router.use(protect);
+router.use(adminOnly);
+
+router.post("/", createAssignment);
+router.get("/", getAssignments);
 router.get("/:id", getAssignmentById);
-router.put("/:id", protect, adminOnly, updateAssignment);
-router.delete("/:id", protect, adminOnly, deleteAssignment);
+router.put("/:id", updateAssignment);
+router.delete("/:id", deleteAssignment);
 
 export default router;
