@@ -1,31 +1,27 @@
-import Shift from "../models/shift.js";
+import assignment from "../models/assignment.js";
 
 export const calculatePayroll = async (userId, start, end) => {
   try { 
-    const shifts = await Shift.find({
-      date: {
-        $gte: new Date(start),
-        $lte: new Date(end)
-      },
+    const assignments = await Assignment.find({
       staff: userId
-    });
+    }).populate("shift");
+
     const payroll = {};
     let totalHours = 0;
     let totalPay = 0;
-    shifts.forEach(s => {
-        const start = new Date(s.startTime);
-        const end = new Date(s.endTime);
 
-        let hours = (end - start) / (1000 * 60 * 60);
+    assignments.forEach(assign => {
+      const start = assign.actualStartTime || assign.shift.startTime;
+      const end = assign.actualEndTime || assign.shift.endTime;
 
-        if (s.role !== "manager"){
-            hours -= 1;
-        }
+      let hours = (end - start) / (1000 * 60 * 60);
 
-        totalHours += hours;
-        totalPay += hours * s.hourlyRate;
+      hours -= assign.breakMinutes / 60;
 
+      totalHours += hours;
+      totalPay += hours * assign.hourlyRate;
     });
+
     return { totalHours, totalPay };
 
   } catch (error) {
