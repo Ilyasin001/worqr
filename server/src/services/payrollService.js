@@ -3,7 +3,7 @@ import Assignment from "../models/assignment.js";
 export const calculatePayrollPreview = async (userId, periodStart, periodEnd) => {
 
   const assignments = await Assignment.find({
-    staff: userId,
+    staffId: userId,
     isPaid: false,
     actualStartTime: { $ne: null },
     actualEndTime: { $ne: null }
@@ -24,7 +24,7 @@ export const calculatePayrollPreview = async (userId, periodStart, periodEnd) =>
     const end = assign.actualEndTime;
 
     let hours = (end - start) / (1000 * 60 * 60);
-    hours -= assign.breakMinutes / 60;
+    hours -= assign.breakDuration / 60;
 
     if (hours < 0) hours = 0;
 

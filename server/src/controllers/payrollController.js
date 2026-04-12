@@ -63,6 +63,16 @@ export const approvePayroll = async (req, res) => {
 
 export const finalizePayroll = async (req, res) => {
 
+    const batch = await PayrollBatch.findById(req.params.id);
+
+    if (!batch) {
+        return res.status(404).json({ message: "Batch not found" });
+    }
+
+    if (batch.status !== "approved") {
+        return res.status(400).json({ message: "Batch must be approved before finalizing" });
+    }
+
     const session = await mongoose.startSession();
     session.startTransaction();
 
