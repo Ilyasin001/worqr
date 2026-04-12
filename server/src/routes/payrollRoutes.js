@@ -6,9 +6,9 @@ const router = express.Router();
 
 router.use(protect);
 
-router.get("/", getMyPayrollHistory);
+router.get("/my-history", getMyPayrollHistory);
 
-router.use(adminOnly); 
+router.use(adminOnly);
 
 router.post("/draft", createPayrollDraft);
 
@@ -16,9 +16,7 @@ router.post("/:id/approve", approvePayroll);
 
 router.post("/:id/finalize", finalizePayroll);
 
-router.get("/", getPayrollBatches);
-
-router.get("/my-history", getMyPayrollHistory);
+router.get("/batches", getPayrollBatches);
 
 router.get("/summary", getPayrollSummary);
 
