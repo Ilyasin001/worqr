@@ -57,7 +57,7 @@ describe('GET /api/users', () => {
 
   it('returns 200 with user list for admin', async () => {
     setUser('admin');
-    MockUser.find.mockResolvedValue([{ _id: 'uid1' }]);
+    MockUser.find.mockReturnValue({ select: jest.fn().mockResolvedValue([{ _id: 'uid1' }]) });
     const res = await request(app).get('/api/users').set('Authorization', TOKEN);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
@@ -75,11 +75,9 @@ describe('GET /api/users/:id', () => {
 
   it('returns 404 when user not found', async () => {
     setUser('staff');
-    // Simulate findById returning null for the route param (not the protect call)
-    // protect calls findById first (returns staff user), then the controller calls it again
     MockUser.findById
       .mockReturnValueOnce({ select: jest.fn().mockResolvedValue({ _id: 'uid1', role: 'staff' }) })
-      .mockResolvedValueOnce(null);
+      .mockReturnValueOnce({ select: jest.fn().mockResolvedValue(null) });
     const res = await request(app).get('/api/users/uid2').set('Authorization', TOKEN);
     expect(res.status).toBe(404);
   });
@@ -88,7 +86,7 @@ describe('GET /api/users/:id', () => {
     setUser('staff');
     MockUser.findById
       .mockReturnValueOnce({ select: jest.fn().mockResolvedValue({ _id: 'uid1', role: 'staff' }) })
-      .mockResolvedValueOnce({ _id: 'uid1', name: 'Alice' });
+      .mockReturnValueOnce({ select: jest.fn().mockResolvedValue({ _id: 'uid1', name: 'Alice' }) });
     const res = await request(app).get('/api/users/uid1').set('Authorization', TOKEN);
     expect(res.status).toBe(200);
   });
@@ -104,8 +102,8 @@ describe('PUT /api/users/:id', () => {
   });
 
   it('returns 404 when user not found', async () => {
-    setUser('staff');
-    MockUser.findByIdAndUpdate.mockResolvedValue(null);
+    setUser('admin');
+    MockUser.findByIdAndUpdate.mockReturnValue({ select: jest.fn().mockResolvedValue(null) });
     const res = await request(app)
       .put('/api/users/uid1')
       .set('Authorization', TOKEN)
@@ -114,8 +112,8 @@ describe('PUT /api/users/:id', () => {
   });
 
   it('returns 200 on success', async () => {
-    setUser('staff');
-    MockUser.findByIdAndUpdate.mockResolvedValue({ _id: 'uid1', name: 'Bob' });
+    setUser('admin');
+    MockUser.findByIdAndUpdate.mockReturnValue({ select: jest.fn().mockResolvedValue({ _id: 'uid1', name: 'Bob' }) });
     const res = await request(app)
       .put('/api/users/uid1')
       .set('Authorization', TOKEN)

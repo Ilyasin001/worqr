@@ -123,18 +123,19 @@ describe('finalizePayroll', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'Payroll completed' }));
   });
 
-  it('aborts the transaction and returns 500 on DB error', async () => {
+  it('aborts the transaction and forwards the error via next on DB error', async () => {
     const batch = { status: 'approved', assignments: [], save: jest.fn() };
     mockBatchFindById.mockResolvedValue(batch);
     mockAssignmentUpdateMany.mockRejectedValue(new Error('DB error'));
     const session = makeSession();
     mockStartSession.mockResolvedValue(session);
     const res = makeRes();
+    const next = jest.fn();
 
-    await finalizePayroll({ params: { id: 'b1' } }, res);
+    await finalizePayroll({ params: { id: 'b1' } }, res, next);
 
     expect(session.abortTransaction).toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(500);
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
   });
 });
 

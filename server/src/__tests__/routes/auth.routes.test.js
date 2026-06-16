@@ -98,7 +98,8 @@ describe('POST /api/auth/login', () => {
   });
 
   it('returns 200 with a token on success', async () => {
-    const user = { _id: 'uid1', passwordHash: 'hash', role: 'staff' };
+    const userData = { _id: 'uid1', role: 'staff' };
+    const user = { ...userData, passwordHash: 'hash', toObject: () => ({ ...userData, passwordHash: 'hash' }) };
     mockFindOne.mockResolvedValue(user);
     mockCompare.mockResolvedValue(true);
     mockSign.mockReturnValue('jwt-token');

@@ -8,7 +8,8 @@ import shiftRoutes from "./routes/shiftRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import assignmentRoutes from "./routes/assignmentRoutescr.js";
 import authRoutes from "./routes/authRoutes.js";
-import payrollRoutes from "./routes/payrollRoutes.js"
+import payrollRoutes from "./routes/payrollRoutes.js";
+import { errorHandler } from "./middleware/errorMiddleware.js";
 
 dotenv.config();
 
@@ -37,6 +38,8 @@ app.use("/api/payroll", payrollRoutes);
 app.get("/", (req, res) => {
   res.send("Hello, World!");
 });
+
+app.use(errorHandler);
 
 // Start server - client connection
 app.listen(PORT, () => {

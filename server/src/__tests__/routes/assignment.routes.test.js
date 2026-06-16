@@ -103,7 +103,7 @@ describe('POST /api/assignments', () => {
     const res = await request(app)
       .post('/api/assignments')
       .set('Authorization', TOKEN)
-      .send({ shiftId: '507f1f77bcf86cd799439011', staffId: '507f1f77bcf86cd799439012', breakDuration: 30 });
+      .send({ shiftId: '507f1f77bcf86cd799439011', staffId: '507f1f77bcf86cd799439012', hourlyRate: 12.5, breakDuration: 30 });
     expect(res.status).toBe(201);
   });
 });
