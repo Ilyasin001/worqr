@@ -27,7 +27,7 @@ const shiftSchema = new mongoose.Schema({
 
 shiftSchema.pre('save', function(next) {
     if (this.endTime <= this.startTime) {
-        next(new Error('End time must be after start time'));
+        return next(new Error('End time must be after start time'));
     }
     next();
 });

@@ -2,8 +2,8 @@ import assignment from "../models/assignment.js";
 
 export const createAssignment = async (req, res) => {
     try {
-        const { shiftId, staffId, role, breakDuration } = req.body;
-        const newAssignment = new assignment({ shiftId, staffId, role, breakDuration});
+        const { shiftId, staffId, hourlyRate, breakDuration } = req.body;
+        const newAssignment = new assignment({ shiftId, staffId, hourlyRate, breakDuration });
         const savedAssignment = await newAssignment.save();
         res.status(201).json(savedAssignment);
     } catch (error) {
@@ -36,7 +36,17 @@ export const getAssignmentById = async (req, res) => {
 
 export const updateAssignment = async (req, res) => {
     try {
-        const updatedAssignment = await assignment.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const { shiftId, staffId, hourlyRate, breakDuration, actualStartTime, actualEndTime, isPaid } = req.body;
+        const updates = {};
+        if (shiftId !== undefined) updates.shiftId = shiftId;
+        if (staffId !== undefined) updates.staffId = staffId;
+        if (hourlyRate !== undefined) updates.hourlyRate = hourlyRate;
+        if (breakDuration !== undefined) updates.breakDuration = breakDuration;
+        if (actualStartTime !== undefined) updates.actualStartTime = actualStartTime;
+        if (actualEndTime !== undefined) updates.actualEndTime = actualEndTime;
+        if (isPaid !== undefined) updates.isPaid = isPaid;
+
+        const updatedAssignment = await assignment.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
         if (!updatedAssignment) {
             return res.status(404).json({ message: "Assignment not found" });
         }

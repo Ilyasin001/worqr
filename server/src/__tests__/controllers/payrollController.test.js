@@ -9,7 +9,7 @@ const mockAssignmentUpdateMany = jest.fn();
 const mockStartSession  = jest.fn();
 const mockCalculatePayrollPreview = jest.fn();
 
-jest.unstable_mockModule('../models/payrollBatch.js', () => ({
+jest.unstable_mockModule('../../models/payrollBatch.js', () => ({
   default: {
     findById: mockBatchFindById,
     findOne:  mockBatchFindOne,
@@ -17,7 +17,7 @@ jest.unstable_mockModule('../models/payrollBatch.js', () => ({
   },
 }));
 
-jest.unstable_mockModule('../models/assignment.js', () => ({
+jest.unstable_mockModule('../../models/assignment.js', () => ({
   default: { updateMany: mockAssignmentUpdateMany },
 }));
 
@@ -25,11 +25,11 @@ jest.unstable_mockModule('mongoose', () => ({
   default: { startSession: mockStartSession },
 }));
 
-jest.unstable_mockModule('../services/payrollService.js', () => ({
+jest.unstable_mockModule('../../services/payrollService.js', () => ({
   calculatePayrollPreview: mockCalculatePayrollPreview,
 }));
 
-const { approvePayroll, finalizePayroll, createPayrollDraft } = await import('../controllers/payrollController.js');
+const { approvePayroll, finalizePayroll, createPayrollDraft } = await import('../../controllers/payrollController.js');
 
 // ---------------------------------------------------------------------------
 // helpers

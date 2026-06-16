@@ -43,7 +43,7 @@ assignmentSchema.index(
 
 assignmentSchema.pre('save', function(next) {
     if (this.actualStartTime && this.actualEndTime && this.actualEndTime <= this.actualStartTime) {
-        next(new Error('Actual end time must be after actual start time'));
+        return next(new Error('Actual end time must be after actual start time'));
     }
     next();
 });

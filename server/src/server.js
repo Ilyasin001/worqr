@@ -6,7 +6,7 @@ import cors from "cors";
 import userRoutes from "./routes/userRoutes.js";
 import shiftRoutes from "./routes/shiftRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
-import assignmentRoutes from "./routes/assignmentRoutes.js";
+import assignmentRoutes from "./routes/assignmentRoutescr.js";
 import authRoutes from "./routes/authRoutes.js";
 import payrollRoutes from "./routes/payrollRoutes.js"
 

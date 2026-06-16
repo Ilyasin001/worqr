@@ -38,7 +38,7 @@ export const updateEvent = async (req,res) => {
         if (!updateEvent){
             return res.status(404).json({ message: "Event not found" });
         }
-        res.status(200).json({message : "Event updated"});
+        res.status(200).json(updateEvent);
     } catch (error) {
         res.status(500).json({ message : error.message });
     }

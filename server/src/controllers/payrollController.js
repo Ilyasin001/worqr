@@ -35,7 +35,7 @@ export const createPayrollDraft = async (req, res) => {
         totalPay: preview.totalPay,
         assignments: preview.assignments.map(a => a._id),
         status: "draft",
-        processedBy: req.user.userId
+        processedBy: req.user._id
     });
 
     res.json(batch);
@@ -126,7 +126,7 @@ export const getPayrollBatches = async (req, res) => {
 export const getMyPayrollHistory = async (req, res) => {
   try {
     const batches = await PayrollBatch.find({
-      staff: req.user.userId,
+      staff: req.user._id,
       status: "paid"
     })
       .sort({ periodStart: -1 });

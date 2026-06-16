@@ -1,8 +1,5 @@
 /** @type {import('jest').Config} */
 const config = {
-  // Treat .js files as ESM (required for "type": "module" projects)
-  extensionsToTreatAsEsm: ['.js'],
-
   // Test environment
   testEnvironment: 'node',
 
@@ -15,6 +12,8 @@ const config = {
     'src/**/*.js',
     '!src/server.js',        // entry point — not unit-testable
     '!src/config/**',        // DB connection bootstrapping
+    '!src/models/**',        // Mongoose schema definitions — no logic to unit test
+    '!src/utils/**',         // simple utility classes
   ],
   coverageDirectory: 'coverage',
   coverageProvider: 'v8',

@@ -3,19 +3,21 @@ import bcrypt from "bcrypt";
 
 export const createUser = async (req, res) => {
     try {
-        const { name, address, email, passwordHash, role, hourlyRate } = req.body;
-        const newUser = new User({ name, address, email, passwordHash, role, hourlyRate });
-        newUser.passwordHash = await bcrypt.hash(newUser.passwordHash, 10);
+        const { name, address, email, password, hourlyRate } = req.body;
+        // role is intentionally excluded — always defaults to 'staff'
+        const passwordHash = await bcrypt.hash(password, 10);
+        const newUser = new User({ name, address, email, passwordHash, hourlyRate });
         const savedUser = await newUser.save();
-        res.status(201).json(savedUser);
+        const { passwordHash: _pw, ...safeUser } = savedUser.toObject();
+        res.status(201).json(safeUser);
     } catch (error) {
-            res.status(400).json({ message: error.message });
+        res.status(400).json({ message: error.message });
     }
 };
 
 export const getUsers = async (req, res) => {
      try {
-            const users = await User.find();
+            const users = await User.find().select('-passwordHash');
             res.status(200).json(users);
         } catch (error) {
             res.status(500).json({ message: error.message });
@@ -24,7 +26,7 @@ export const getUsers = async (req, res) => {
 
 export const getUserById = async (req, res) => {
     try {
-            const user = await User.findById(req.params.id);
+            const user = await User.findById(req.params.id).select('-passwordHash');
             if (!user) {
                 return res.status(404).json({ message: "User not found" });
             }
@@ -36,7 +38,25 @@ export const getUserById = async (req, res) => {
 
 export const updateUser = async (req, res) => {
      try {
-        const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const { name, address, email, password, role, hourlyRate } = req.body;
+        const updates = {};
+        if (name !== undefined) updates.name = name;
+        if (address !== undefined) updates.address = address;
+        if (email !== undefined) updates.email = email;
+        if (role !== undefined) {
+            if (req.user._id.toString() === req.params.id) {
+                return res.status(403).json({ message: "Cannot change your own role" });
+            }
+            updates.role = role;
+        }
+        if (hourlyRate !== undefined) updates.hourlyRate = hourlyRate;
+        if (password !== undefined) updates.passwordHash = await bcrypt.hash(password, 10);
+
+        const updatedUser = await User.findByIdAndUpdate(
+            req.params.id,
+            updates,
+            { new: true, runValidators: true }
+        ).select('-passwordHash');
         if (!updatedUser) {
             return res.status(404).json({ message: "User not found" });
         }
