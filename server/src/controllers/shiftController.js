@@ -32,7 +32,19 @@ export const createShift = async (req, res, next) => {
 
 export const getShifts = async (req, res, next) => {
     try {
-        const shifts = await Shift.find({ company: req.companyId });
+        const { eventId, confirmed, from, to } = req.query;
+        const filter = { company: req.companyId };
+
+        if (eventId) filter.eventId = eventId;
+        if (confirmed !== undefined) filter.confirmed = confirmed === "true";
+
+        if (from || to) {
+            filter.startTime = {};
+            if (from) filter.startTime.$gte = new Date(from);
+            if (to) filter.startTime.$lte = new Date(to);
+        }
+
+        const shifts = await Shift.find(filter).sort({ startTime: 1 });
         res.status(200).json(shifts);
     } catch (error) {
         next(error);

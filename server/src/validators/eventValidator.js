@@ -24,6 +24,15 @@ export const createEventValidator = [
   body('status')
     .optional()
     .isIn(['pending', 'confirmed', 'cancelled']).withMessage('Status must be pending, confirmed, or cancelled'),
+
+  body('capacity')
+    .optional({ nullable: true })
+    .isInt({ min: 0 }).withMessage('Capacity must be a non-negative whole number'),
+
+  body('notes')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 }).withMessage('Notes must be 2000 characters or fewer'),
 ];
 
 export const updateEventValidator = [
@@ -51,6 +60,15 @@ export const updateEventValidator = [
   body('status')
     .optional()
     .isIn(['pending', 'confirmed', 'cancelled']).withMessage('Status must be pending, confirmed, or cancelled'),
+
+  body('capacity')
+    .optional({ nullable: true })
+    .isInt({ min: 0 }).withMessage('Capacity must be a non-negative whole number'),
+
+  body('notes')
+    .optional()
+    .trim()
+    .isLength({ max: 2000 }).withMessage('Notes must be 2000 characters or fewer'),
 ];
 
 export const validate = (req, res, next) => {

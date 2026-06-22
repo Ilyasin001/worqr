@@ -21,6 +21,10 @@ MockEvent.findOneAndUpdate = jest.fn();
 MockEvent.findOneAndDelete = jest.fn();
 
 jest.unstable_mockModule('../../models/event.js', () => ({ default: MockEvent }));
+jest.unstable_mockModule('../../services/eventStats.js', () => ({
+  fillCountsByEvent: jest.fn().mockResolvedValue(new Map()),
+  fillCountForEvent: jest.fn().mockResolvedValue(0),
+}));
 
 const { default: eventRouter } = await import('../../routes/eventRoutes.js');
 const { errorHandler }         = await import('../../middleware/errorMiddleware.js');
@@ -54,7 +58,7 @@ describe('GET /api/events', () => {
 
   it('returns this company\'s events with 200', async () => {
     setUser('staff');
-    MockEvent.find.mockResolvedValue([{ _id: 'e1', title: 'Gala' }]);
+    MockEvent.find.mockReturnValue({ sort: () => ({ lean: () => Promise.resolve([{ _id: 'e1', title: 'Gala' }]) }) });
     const res = await request(app).get('/api/events').set('Authorization', TOKEN);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
@@ -67,14 +71,14 @@ describe('GET /api/events', () => {
 describe('GET /api/events/:id', () => {
   it('returns the event with 200', async () => {
     setUser('staff');
-    MockEvent.findOne.mockResolvedValue({ _id: 'e1', title: 'Gala' });
+    MockEvent.findOne.mockReturnValue({ lean: () => Promise.resolve({ _id: 'e1', title: 'Gala' }) });
     const res = await request(app).get('/api/events/e1').set('Authorization', TOKEN);
     expect(res.status).toBe(200);
   });
 
   it('returns 404 when not found in company', async () => {
     setUser('staff');
-    MockEvent.findOne.mockResolvedValue(null);
+    MockEvent.findOne.mockReturnValue({ lean: () => Promise.resolve(null) });
     const res = await request(app).get('/api/events/e1').set('Authorization', TOKEN);
     expect(res.status).toBe(404);
   });

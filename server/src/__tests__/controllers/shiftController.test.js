@@ -19,7 +19,7 @@ const {
 } = await import('../../controllers/shiftController.js');
 
 const makeRes = () => ({ status: jest.fn().mockReturnThis(), json: jest.fn() });
-const ctx = { companyId: 'co1' };
+const ctx = { companyId: 'co1', query: {} };
 
 // ---------------------------------------------------------------------------
 // createShift
@@ -71,19 +71,19 @@ describe('createShift', () => {
 describe('getShifts', () => {
   it('returns this company\'s shifts with 200', async () => {
     const shifts = [{ _id: 's1' }];
-    MockShift.find.mockResolvedValue(shifts);
+    MockShift.find.mockReturnValue({ sort: () => Promise.resolve(shifts) });
     const res = makeRes();
 
     await getShifts(ctx, res, jest.fn());
 
-    expect(MockShift.find).toHaveBeenCalledWith({ company: 'co1' });
+    expect(MockShift.find).toHaveBeenCalledWith(expect.objectContaining({ company: 'co1' }));
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(shifts);
   });
 
   it('forwards errors to next', async () => {
     const err = new Error('fail');
-    MockShift.find.mockRejectedValue(err);
+    MockShift.find.mockReturnValue({ sort: () => Promise.reject(err) });
     const next = jest.fn();
 
     await getShifts(ctx, makeRes(), next);

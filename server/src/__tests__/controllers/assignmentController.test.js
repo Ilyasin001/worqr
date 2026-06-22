@@ -26,8 +26,9 @@ const ctx = { companyId: 'co1' };
 // ---------------------------------------------------------------------------
 describe('createAssignment', () => {
   it('creates the assignment when shift + staff are in-company, returns 201', async () => {
-    MockShift.findOne.mockResolvedValue({ _id: 's1' });
+    MockShift.findOne.mockResolvedValue({ _id: 's1', startTime: new Date('2026-01-01T09:00:00Z'), endTime: new Date('2026-01-01T17:00:00Z') });
     MockUser.findOne.mockResolvedValue({ _id: 'uid1' });
+    MockAssignment.find.mockReturnValue({ populate: () => Promise.resolve([]) }); // no conflicting assignments
     const saved = { _id: 'a1' };
     MockAssignment.create.mockResolvedValue(saved);
     const res = makeRes();

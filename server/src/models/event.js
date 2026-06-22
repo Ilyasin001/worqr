@@ -28,10 +28,19 @@ const eventSchema = new mongoose.Schema({
         required: true,
         index: true
     },
-    status: { 
-        type: String, 
-        enum: ['pending', 'confirmed', 'cancelled'], 
-        default: 'pending' 
+    status: {
+        type: String,
+        enum: ['pending', 'confirmed', 'cancelled'],
+        default: 'pending'
+    },
+    // Target headcount for the event (optional); filled count is computed from assignments.
+    capacity: {
+        type: Number,
+        min: 0
+    },
+    notes: {
+        type: String,
+        default: ""
     }
 }, { timestamps: true });
 

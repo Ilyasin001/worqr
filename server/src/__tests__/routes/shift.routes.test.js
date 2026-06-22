@@ -56,7 +56,7 @@ describe('GET /api/shifts', () => {
 
   it('returns 200 with shift list for authenticated user', async () => {
     setUser('staff');
-    MockShift.find.mockResolvedValue([{ _id: 's1' }]);
+    MockShift.find.mockReturnValue({ sort: () => Promise.resolve([{ _id: 's1' }]) });
     const res = await request(app).get('/api/shifts').set('Authorization', TOKEN);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);

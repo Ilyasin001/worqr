@@ -35,6 +35,11 @@ const assignmentSchema = new mongoose.Schema({
         required: true,
         min: 0
     },
+    status: {
+        type: String,
+        enum: ['assigned', 'confirmed', 'declined', 'cancelled'],
+        default: 'assigned'
+    },
     isPaid: {
         type: Boolean,
         default: false

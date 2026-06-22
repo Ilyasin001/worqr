@@ -46,6 +46,12 @@ export const updateAssignmentValidator = [
     .isBoolean().withMessage('isPaid must be a boolean'),
 ];
 
+export const updateAssignmentStatusValidator = [
+  body('status')
+    .notEmpty().withMessage('Status is required')
+    .isIn(['assigned', 'confirmed', 'declined', 'cancelled']).withMessage('Invalid status'),
+];
+
 export const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {

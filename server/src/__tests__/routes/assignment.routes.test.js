@@ -102,8 +102,9 @@ describe('POST /api/assignments', () => {
 
   it('returns 201 for admin with in-company refs and valid body', async () => {
     setUser('admin');
-    mockShiftFindOne.mockResolvedValue({ _id: 's1' });
+    mockShiftFindOne.mockResolvedValue({ _id: 's1', startTime: new Date('2026-01-01T09:00:00Z'), endTime: new Date('2026-01-01T17:00:00Z') });
     mockUserFindOne.mockResolvedValue({ _id: 'uid2' });
+    MockAssignment.find.mockReturnValue({ populate: () => Promise.resolve([]) }); // no conflicts
     MockAssignment.create.mockResolvedValue({ _id: 'a1' });
     const res = await request(app)
       .post('/api/assignments')

@@ -13,20 +13,26 @@ export default function Shifts({ user }) {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState(null)
   const [search, setSearch]   = useState('')
+  const [eventFilter, setEventFilter]       = useState('')
+  const [confirmedFilter, setConfirmedFilter] = useState('all')
   const [modal, setModal]     = useState(null)
   const [form, setForm]       = useState(EMPTY)
 
   const isAdmin = user.role === 'admin'
 
+  // Reference data (events, staff) loaded once.
   useEffect(() => {
-    Promise.all([
-      getShifts().catch(() => []),
-      getEvents().catch(() => []),
-      getStaff().catch(() => []),
-    ])
-      .then(([s, ev, st]) => { setShifts(s); setEvents(ev); setStaff(st) })
-      .finally(() => setLoading(false))
+    Promise.all([getEvents().catch(() => []), getStaff().catch(() => [])])
+      .then(([ev, st]) => { setEvents(ev); setStaff(st) })
   }, [])
+
+  // Shifts re-fetched from the backend whenever the filters change.
+  useEffect(() => {
+    const params = {}
+    if (eventFilter) params.eventId = eventFilter
+    if (confirmedFilter !== 'all') params.confirmed = confirmedFilter
+    getShifts(params).then(setShifts).catch(e => setError(e.message)).finally(() => setLoading(false))
+  }, [eventFilter, confirmedFilter])
 
   const visible = shifts.filter(s => {
     const ev = events.find(e => e._id === s.eventId)
@@ -101,7 +107,18 @@ export default function Shifts({ user }) {
             <span className="search-icon">🔍</span>
             <input placeholder="Search by event…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <span className="badge badge-blue">{visible.length} shifts</span>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <select className="form-select" style={{ width: 'auto' }} value={eventFilter} onChange={e => setEventFilter(e.target.value)}>
+              <option value="">All events</option>
+              {events.map(ev => <option key={ev._id} value={ev._id}>{ev.title}</option>)}
+            </select>
+            <select className="form-select" style={{ width: 'auto' }} value={confirmedFilter} onChange={e => setConfirmedFilter(e.target.value)}>
+              <option value="all">All statuses</option>
+              <option value="true">Confirmed</option>
+              <option value="false">Pending</option>
+            </select>
+            <span className="badge badge-blue">{visible.length} shifts</span>
+          </div>
         </div>
 
         <div className="table-wrap">

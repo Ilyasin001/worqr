@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { fmtDate, statusBadge } from '../data/mockData.js'
 import { getEvents, createEvent, updateEvent, deleteEvent } from '../api/events.js'
 
-const EMPTY = { title: '', description: '', date: '', address: '', status: 'pending' }
+const EMPTY = { title: '', description: '', date: '', address: '', status: 'pending', capacity: '', notes: '' }
 
 export default function Events({ user }) {
   const [events, setEvents]     = useState([])
@@ -16,35 +16,31 @@ export default function Events({ user }) {
 
   const isAdmin = user.role === 'admin'
 
-  useEffect(() => {
-    getEvents()
-      .then(setEvents)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
-  }, [])
+  // Server-side search + status filter (debounced so typing doesn't spam the API).
+  const load = (params) => getEvents(params).then(setEvents).catch(e => setError(e.message)).finally(() => setLoading(false))
 
-  const visible = events.filter(e => {
-    const matchSearch = e.title.toLowerCase().includes(search.toLowerCase()) ||
-                        (e.address || '').toLowerCase().includes(search.toLowerCase())
-    const matchFilter = filter === 'all' || e.status === filter
-    return matchSearch && matchFilter
-  })
+  useEffect(() => {
+    const t = setTimeout(() => load({ q: search, status: filter }), search ? 300 : 0)
+    return () => clearTimeout(t)
+  }, [search, filter])
+
+  const visible = events
 
   const openCreate = () => { setForm(EMPTY); setModal('create') }
-  const openEdit   = (ev) => { setForm({ ...ev }); setModal(ev) }
+  const openEdit   = (ev) => { setForm({ ...EMPTY, ...ev, capacity: ev.capacity ?? '' }); setModal(ev) }
   const closeModal = () => { setModal(null); setForm(EMPTY) }
 
   const save = async () => {
     if (!form.title || !form.date) return
+    const payload = { ...form, capacity: form.capacity === '' ? null : Number(form.capacity) }
     try {
       if (modal === 'create') {
-        const created = await createEvent(form)
-        setEvents(prev => [...prev, created])
+        await createEvent(payload)
       } else {
-        const updated = await updateEvent(modal._id, form)
-        setEvents(prev => prev.map(e => e._id === modal._id ? updated : e))
+        await updateEvent(modal._id, payload)
       }
       closeModal()
+      load({ q: search, status: filter })
     } catch (e) {
       setError(e.message)
     }
@@ -115,6 +111,7 @@ export default function Events({ user }) {
                   <th>Event</th>
                   <th>Date</th>
                   <th>Location</th>
+                  <th>Staffing</th>
                   <th>Status</th>
                   {isAdmin && <th>Actions</th>}
                 </tr>
@@ -128,6 +125,11 @@ export default function Events({ user }) {
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(ev.date)}</td>
                     <td style={{ color: 'var(--text-muted)' }}>{ev.address || '—'}</td>
+                    <td>
+                      {ev.capacity != null
+                        ? <span className={`badge ${ev.filledCount >= ev.capacity ? 'badge-green' : 'badge-gray'}`}>{ev.filledCount ?? 0} / {ev.capacity}</span>
+                        : <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{ev.filledCount ?? 0} staffed</span>}
+                    </td>
                     <td><span className={`badge ${statusBadge(ev.status)}`}>{ev.status}</span></td>
                     {isAdmin && (
                       <td>
@@ -176,9 +178,19 @@ export default function Events({ user }) {
                   </select>
                 </div>
               </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Address</label>
+                  <input className="form-input" placeholder="Venue address" value={form.address} onChange={e => setForm(f => ({...f, address: e.target.value}))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Capacity</label>
+                  <input className="form-input" type="number" min="0" placeholder="Staff needed" value={form.capacity} onChange={e => setForm(f => ({...f, capacity: e.target.value}))} />
+                </div>
+              </div>
               <div className="form-group">
-                <label className="form-label">Address</label>
-                <input className="form-input" placeholder="Venue address" value={form.address} onChange={e => setForm(f => ({...f, address: e.target.value}))} />
+                <label className="form-label">Notes</label>
+                <textarea className="form-input" rows="3" placeholder="Internal notes (optional)" value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} />
               </div>
             </div>
             <div className="modal-footer">

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { fmtDateTime } from '../data/mockData.js'
-import { getAssignments, createAssignment, updateAssignment, deleteAssignment } from '../api/assignments.js'
+import { getAssignments, createAssignment, updateAssignment, updateAssignmentStatus, deleteAssignment } from '../api/assignments.js'
+
+const STATUS_BADGE = { assigned: 'badge-yellow', confirmed: 'badge-green', declined: 'badge-gray', cancelled: 'badge-gray' }
 import { getShifts } from '../api/shifts.js'
 import { getStaff } from '../api/staff.js'
 import { getEvents } from '../api/events.js'
@@ -76,6 +78,16 @@ export default function Assignments({ user }) {
     }
   }
 
+  const changeStatus = async (id, status) => {
+    setError(null)
+    try {
+      const updated = await updateAssignmentStatus(id, status)
+      setAssignments(prev => prev.map(a => a._id === id ? { ...a, ...updated } : a))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   const calcHours = (a) => {
     if (!a.actualStartTime || !a.actualEndTime) return null
     const hrs = (new Date(a.actualEndTime) - new Date(a.actualStartTime)) / 3600000 - (a.breakDuration / 60)
@@ -124,6 +136,7 @@ export default function Assignments({ user }) {
                   <th>Event</th>
                   <th>Shift</th>
                   <th>Rate</th>
+                  <th>Status</th>
                   <th>Actual Hours</th>
                   <th>Payment</th>
                   {isAdmin && <th>Actions</th>}
@@ -156,6 +169,29 @@ export default function Assignments({ user }) {
                         ) : '—'}
                       </td>
                       <td style={{ fontWeight: 600 }}>£{Number(a.hourlyRate).toFixed(2)}</td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                          <span className={`badge ${STATUS_BADGE[a.status] || 'badge-gray'}`}>{a.status || 'assigned'}</span>
+                          {isAdmin ? (
+                            <select
+                              className="form-select"
+                              style={{ padding: '2px 4px', fontSize: 11, height: 'auto' }}
+                              value={a.status || 'assigned'}
+                              onChange={e => changeStatus(a._id, e.target.value)}
+                            >
+                              <option value="assigned">assigned</option>
+                              <option value="confirmed">confirmed</option>
+                              <option value="declined">declined</option>
+                              <option value="cancelled">cancelled</option>
+                            </select>
+                          ) : (a.staffId === user._id && ['assigned'].includes(a.status || 'assigned')) ? (
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button className="btn btn-secondary btn-sm" onClick={() => changeStatus(a._id, 'confirmed')}>Confirm</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => changeStatus(a._id, 'declined')}>Decline</button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </td>
                       <td>
                         {hours
                           ? <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{hours}h</span>

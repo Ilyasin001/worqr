@@ -3,7 +3,12 @@ import Shift from "../models/shift.js";
 import User from "../models/user.js";
 import { AppError } from "../utils/appError.js";
 
-// Verifies the shift + staff member both belong to the caller's company.
+// Two time ranges overlap when each starts before the other ends.
+const overlaps = (a, b) =>
+    a.startTime < b.endTime && b.startTime < a.endTime;
+
+// Verifies the shift + staff member both belong to the caller's company and
+// returns the loaded shift (needed for conflict detection).
 const assertAssignmentRefsInCompany = async (companyId, shiftId, staffId) => {
     const shift = await Shift.findOne({ _id: shiftId, company: companyId });
     if (!shift) {
@@ -13,12 +18,31 @@ const assertAssignmentRefsInCompany = async (companyId, shiftId, staffId) => {
     if (!staff) {
         throw new AppError("Staff member not found in your company", 400);
     }
+    return shift;
+};
+
+// Throws 409 if the staff member already has an active assignment on a shift
+// whose time overlaps `targetShift` (double-booking). `ignoreAssignmentId`
+// skips the assignment being updated.
+const assertNoStaffConflict = async (companyId, staffId, targetShift, ignoreAssignmentId = null) => {
+    const active = await Assignment.find({
+        company: companyId,
+        staffId,
+        status: { $in: ["assigned", "confirmed"] },
+        ...(ignoreAssignmentId ? { _id: { $ne: ignoreAssignmentId } } : {}),
+    }).populate("shiftId");
+
+    const clash = active.some((a) => a.shiftId && overlaps(a.shiftId, targetShift));
+    if (clash) {
+        throw new AppError("Staff member already has an overlapping shift in this period", 409);
+    }
 };
 
 export const createAssignment = async (req, res, next) => {
     try {
         const { shiftId, staffId, hourlyRate, breakDuration } = req.body;
-        await assertAssignmentRefsInCompany(req.companyId, shiftId, staffId);
+        const shift = await assertAssignmentRefsInCompany(req.companyId, shiftId, staffId);
+        await assertNoStaffConflict(req.companyId, staffId, shift);
 
         const newAssignment = await Assignment.create({
             shiftId, staffId, hourlyRate, breakDuration,
@@ -78,6 +102,38 @@ export const updateAssignment = async (req, res, next) => {
             throw new AppError("Assignment not found", 404);
         }
         res.status(200).json(updated);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Status transitions. Staff may confirm/decline their OWN assignment; admins
+// may set any in-company assignment to any status (incl. cancel / re-assign).
+const STAFF_ALLOWED = ["confirmed", "declined"];
+
+export const updateAssignmentStatus = async (req, res, next) => {
+    try {
+        const { status } = req.body;
+        const assignment = await Assignment.findOne({ _id: req.params.id, company: req.companyId });
+        if (!assignment) {
+            throw new AppError("Assignment not found", 404);
+        }
+
+        const isAdmin = req.user.role === "admin";
+        const isOwner = assignment.staffId.toString() === req.user._id.toString();
+
+        if (!isAdmin) {
+            if (!isOwner) {
+                throw new AppError("You can only update your own assignments", 403);
+            }
+            if (!STAFF_ALLOWED.includes(status)) {
+                throw new AppError("You can only confirm or decline an assignment", 403);
+            }
+        }
+
+        assignment.status = status;
+        await assignment.save();
+        res.status(200).json(assignment);
     } catch (error) {
         next(error);
     }
