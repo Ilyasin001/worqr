@@ -26,6 +26,8 @@ Authentication uses JSON Web Tokens carrying `{ id, role, companyId }`, with rol
 - **Company onboarding** — create a company (atomic company + first admin), or join an existing one with a company code; admins can view and rotate the join code.
 - **Multi-tenant isolation** — every resource is scoped to the caller's company; cross-entity creates verify referenced documents belong to the same company.
 - **Authentication & roles** — JWT auth with hashed passwords; `protect`, `adminOnly`, and `restrictTo(...)` middleware; the company is read from the database record, never trusted from the token.
+- **Account lifecycle** — self-service profile, change password, forgot/reset password (hashed, time-limited tokens), and soft email verification with a resend flow. Emails are sent over SMTP (any provider) via Nodemailer, with best-effort delivery and a console fallback when SMTP isn't configured.
+- **Session management** — short-lived access tokens paired with rotating refresh tokens (stored hashed, with a TTL); the client refreshes transparently on expiry, and logout revokes the refresh token server-side.
 - **Workforce management** — CRUD for users, events, shifts, and assignments (hourly rate + break tracking).
 - **Payroll workflow** — generate a draft from worked assignments, approve it, then finalize inside a transaction that marks assignments paid; per-staff history, admin batch listings, and yearly summaries.
 - **Validation & error handling** — request validation on every write; a centralized error handler returns consistent `{ success, message }` responses and maps Mongoose validation, cast, and duplicate-key errors to the right status codes.
@@ -70,7 +72,18 @@ All routes are mounted under `/api`. Send the JWT returned by the auth endpoints
 **Onboarding & auth (public)**
 - `POST /api/companies/register` — create a company + its first admin; returns a JWT.
 - `POST /api/auth/register` — join an existing company using its `companyCode`; returns a JWT.
-- `POST /api/auth/login` — authenticate; returns a JWT.
+- `POST /api/auth/login` — authenticate; returns a short-lived access token + a refresh token.
+- `POST /api/auth/refresh` — exchange a refresh token for a new access token (rotates the refresh token).
+- `POST /api/auth/logout` — revoke a refresh token.
+- `POST /api/auth/forgot-password` — request a password-reset link (always returns 200).
+- `POST /api/auth/reset-password` — set a new password using the emailed token.
+- `POST /api/auth/verify-email` — confirm an email address using the emailed token.
+
+**Account (authenticated)**
+- `GET /api/auth/me` — the current user's profile.
+- `PATCH /api/auth/me` — update own name / address.
+- `POST /api/auth/change-password` — change password (requires the current one).
+- `POST /api/auth/resend-verification` — re-send the verification email.
 
 **Company**
 - `GET /api/companies/me` — the caller's company (join code shown to admins only).
@@ -97,9 +110,19 @@ Create a `.env` file in `server/`:
 
 ```env
 PORT=3001
-MONGO_URI=mongodb://localhost:27017/worqr
+MONGO_URI=mongodb://localhost:27017/worqr   # or a MongoDB Atlas connection string
 JWT_SECRET=replace-with-a-long-random-secret
-JWT_EXPIRATION=1d
+ACCESS_TOKEN_TTL=15m          # short-lived access token
+REFRESH_TOKEN_TTL_DAYS=30     # refresh token lifetime
+FRONTEND_URL=http://localhost:5173   # used to build links in emails
+
+# Email (optional) — leave blank to log emails to the console instead of sending.
+# SMTP_HOST=smtp.your-provider.com
+# SMTP_PORT=587
+# SMTP_SECURE=false           # true for 465, false for 587
+# SMTP_USER=your-smtp-username
+# SMTP_PASS=your-smtp-password
+# MAIL_FROM=Worqr <no-reply@yourdomain.com>
 ```
 
 Run it:
@@ -111,6 +134,21 @@ npm test       # run the Jest suite
 ```
 
 The API starts on `http://localhost:3001`.
+
+> **Using MongoDB Atlas?** Add your machine's IP to the cluster's *Network Access* allowlist, or connections are refused.
+
+### Seeding demo data
+
+To create a demo company you can log straight into:
+
+```sh
+cd server
+node scripts/seed.js      # seeds the company configured in MONGO_URI
+```
+
+This creates **Demo Events Co** (join code `DEMO2024`) with logins `admin@demo.test` and `sam@demo.test`, both with password `Password1`. Re-running it resets only the demo company.
+
+No database reachable? `node scripts/dev-memory.js` runs the backend against a throwaway in-memory MongoDB and seeds it automatically (data is not persisted).
 
 **2. Frontend**
 
@@ -135,9 +173,9 @@ CI (`.github/workflows/test.yml`) runs `npm ci && npm test` in `server/` on ever
 
 <h2>Project status</h2>
 
-In active development. The multi-tenant foundation is complete and verified (full backend test suite passing with high coverage), and the React client supports onboarding, login, and the core management pages.
+In active development. The multi-tenant foundation and the full authentication & account lifecycle — onboarding, profile, change/forgot/reset password, soft email verification (over SMTP), and session management (access + rotating refresh tokens, logout) — are complete and verified (full backend test suite passing with high coverage). The React client supports onboarding, login, the password/verification flows, a profile page, transparent token refresh, and the core management pages.
 
-Planned next (not yet started): account lifecycle (password reset, email verification, refresh tokens), richer workforce operations (filtering, conflict detection, recurring shifts), time tracking, payroll completion (payslips, exports), notifications, and reporting dashboards. See [`docs/completion-plan.md`](docs/completion-plan.md) for the full roadmap.
+Planned next (not yet started): richer workforce operations (filtering, conflict detection, recurring shifts), time tracking, payroll completion (payslips, exports), notifications, and reporting dashboards. See [`docs/completion-plan.md`](docs/completion-plan.md) for the full roadmap.
 
 <h2>Credits</h2>
 

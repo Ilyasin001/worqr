@@ -23,6 +23,11 @@ jest.unstable_mockModule('bcrypt', () => ({
 jest.unstable_mockModule('jsonwebtoken', () => ({
   default: { sign: mockSign },
 }));
+jest.unstable_mockModule('../../services/refreshTokens.js', () => ({
+  issueRefreshToken: jest.fn().mockResolvedValue('refresh-raw'),
+  rotateRefreshToken: jest.fn(),
+  revokeRefreshToken: jest.fn(),
+}));
 
 const { default: authRouter }  = await import('../../routes/authRoutes.js');
 const { default: request }     = await import('supertest');

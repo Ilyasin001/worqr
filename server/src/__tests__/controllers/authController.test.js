@@ -19,6 +19,11 @@ jest.unstable_mockModule('bcrypt', () => ({
 jest.unstable_mockModule('jsonwebtoken', () => ({
   default: { sign: mockSign },
 }));
+jest.unstable_mockModule('../../services/refreshTokens.js', () => ({
+  issueRefreshToken: jest.fn().mockResolvedValue('refresh-raw'),
+  rotateRefreshToken: jest.fn(),
+  revokeRefreshToken: jest.fn(),
+}));
 
 const { login, register } = await import('../../controllers/authController.js');
 

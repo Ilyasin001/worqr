@@ -10,6 +10,7 @@ export const signToken = (user) => {
       companyId: user.company,
     },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRATION }
+    // Short-lived access token — paired with a long-lived refresh token.
+    { expiresIn: process.env.ACCESS_TOKEN_TTL || "15m" }
   );
 };

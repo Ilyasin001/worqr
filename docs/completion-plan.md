@@ -95,10 +95,19 @@ Owner direction: fix genuinely-broken methods now; bundle authz/endpoint rework
 > **Next reassessment point (per owner): scope was "multi-tenancy only for now."**
 > Phases 2–9 below remain open and are not started.
 
-### Phase 2 — Auth & account lifecycle
-- [ ] `/me` profile (view/update own); password change
-- [ ] Forgot/reset password; email verification
-- [ ] Refresh tokens, logout, revocation
+### ✅ Phase 2 — Auth & account lifecycle (DONE 2026-06-22, refresh tokens deferred)
+- [x] `/me` profile (view + update own name/address); change password (requires current)
+- [x] Forgot/reset password — hashed, time-limited tokens; generic 200 to avoid email enumeration
+- [x] Soft email verification — token issued on register (staff + company owner), `verify-email` + `resend-verification`; login is **not** blocked (`isVerified` flag + frontend banner)
+- [x] Pluggable mailer (`utils/mailer.js`) — logs in dev, silent in test; `services/accountEmails.js` composes verification/reset emails
+- [x] Frontend: profile/settings page, forgot/reset/verify screens (emailed-link deep routing), verification banner
+- [x] Tests: `account.integration.test.js` (250 tests total, ~96% coverage)
+- [x] **Session management (DONE 2026-06-22):** short-lived access tokens (`ACCESS_TOKEN_TTL`, default 15m) + rotating refresh tokens stored hashed in a `RefreshToken` collection (TTL-indexed); `POST /auth/refresh` (rotates), `POST /auth/logout` (revokes); frontend auto-refreshes on 401 and revokes on logout. Tests in `session.integration.test.js` (257 tests total).
+- [x] **Real email provider (DONE 2026-06-22):** `utils/mailer.js` sends over SMTP via Nodemailer (any provider, configured by `SMTP_*` / `MAIL_FROM` env vars), best-effort with a console fallback when unconfigured. Verified end to end against a live SMTP server (Ethereal).
+
+**Phase 2 is fully complete.**
+
+> Demo data: `server/scripts/seed.js` seeds a "Demo Events Co" company (code `DEMO2024`, logins `admin@demo.test` / `sam@demo.test`, password `Password1`). `scripts/dev-memory.js` runs the backend on an in-memory DB when no database is reachable.
 
 ### Phase 3 — Core workforce operations
 - [ ] Event filtering/search/capacity/notes/attachments

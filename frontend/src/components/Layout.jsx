@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { initials } from '../data/mockData.js'
+import { resendVerification } from '../api/account.js'
 
 const NAV = [
   { to: '/',            icon: '⊞', label: 'Dashboard'   },
@@ -8,6 +10,7 @@ const NAV = [
   { to: '/staff',       icon: '👥', label: 'Staff'       },
   { to: '/assignments', icon: '📋', label: 'Assignments' },
   { to: '/payroll',     icon: '💷', label: 'Payroll'     },
+  { to: '/profile',     icon: '👤', label: 'My Profile'  },
 ]
 
 const PAGE_TITLES = {
@@ -17,11 +20,24 @@ const PAGE_TITLES = {
   '/staff':       'Staff',
   '/assignments': 'Assignments',
   '/payroll':     'Payroll',
+  '/profile':     'My Profile',
 }
 
 export default function Layout({ user, onLogout, children }) {
   const { pathname } = useLocation()
   const title = PAGE_TITLES[pathname] || 'WORQR'
+
+  const [verifyMsg, setVerifyMsg] = useState(null)
+  const [dismissed, setDismissed] = useState(false)
+  const resend = async () => {
+    try {
+      await resendVerification()
+      setVerifyMsg('Verification email sent — check your inbox.')
+    } catch (e) {
+      setVerifyMsg(e.message)
+    }
+  }
+  const showBanner = user.isVerified === false && !dismissed
 
   return (
     <div className="app-shell">
@@ -74,6 +90,27 @@ export default function Layout({ user, onLogout, children }) {
             <div className={`avatar avatar-sm avatar-purple`}>{initials(user.name)}</div>
           </div>
         </header>
+
+        {showBanner && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            background: '#FEF3C7', color: '#92400E',
+            padding: '10px 24px', fontSize: 13, borderBottom: '1px solid #FDE68A',
+          }}>
+            <span>✉️</span>
+            <span style={{ flex: 1 }}>
+              {verifyMsg || 'Please verify your email address to secure your account.'}
+            </span>
+            {!verifyMsg && (
+              <button className="link-button" style={{ color: '#92400E' }} onClick={resend}>
+                Resend email
+              </button>
+            )}
+            <button className="link-button" style={{ color: '#92400E' }} onClick={() => setDismissed(true)}>
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <div className="page-body">{children}</div>
       </div>

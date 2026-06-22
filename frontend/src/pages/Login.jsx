@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function Login({ onLogin, onSwitchToRegister }) {
+export default function Login({ onLogin, onSwitchToRegister, onForgotPassword }) {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
@@ -65,6 +65,12 @@ export default function Login({ onLogin, onSwitchToRegister }) {
             {submitting ? 'Signing in…' : 'Sign in →'}
           </button>
         </form>
+
+        {onForgotPassword && (
+          <p style={{ textAlign: 'center', marginTop: 12, fontSize: 13 }}>
+            <button type="button" className="link-button" onClick={onForgotPassword}>Forgot your password?</button>
+          </p>
+        )}
 
         {onSwitchToRegister && (
           <p style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: 'var(--text-muted)' }}>

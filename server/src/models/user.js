@@ -34,7 +34,17 @@ const userSchema = new mongoose.Schema({
         type: Number,
         required: false,
         default: 8.00
-    }
+    },
+    // Email ownership verification (soft — does not gate login).
+    isVerified: {
+        type: Boolean,
+        default: false
+    },
+    verificationTokenHash: { type: String, select: false },
+    verificationExpires: { type: Date, select: false },
+    // Password reset (hashed token + expiry; raw token only ever emailed).
+    resetTokenHash: { type: String, select: false },
+    resetExpires: { type: Date, select: false }
 }, { timestamps: true });
 
 const User = mongoose.model("User", userSchema);

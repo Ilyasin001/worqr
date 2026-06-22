@@ -19,7 +19,8 @@
     "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.0.0",
-    "mongoose": "^9.1.5"
+    "mongoose": "^9.1.5",
+    "nodemailer": "^9.0.1"
   },
   "devDependencies": {
     "cross-env": "^10.1.0",

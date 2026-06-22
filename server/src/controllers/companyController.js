@@ -5,6 +5,9 @@ import User from "../models/user.js";
 import { AppError } from "../utils/appError.js";
 import { generateUniqueCompanyCode } from "../utils/companyCode.js";
 import { signToken } from "../utils/token.js";
+import { buildVerificationToken } from "./accountController.js";
+import { sendVerificationEmail } from "../services/accountEmails.js";
+import { issueRefreshToken } from "../services/refreshTokens.js";
 
 // Public: creates a new company together with its first admin (owner) user.
 // Both documents reference each other, so they are created atomically in a
@@ -21,6 +24,7 @@ export const registerCompany = async (req, res, next) => {
 
         const code = await generateUniqueCompanyCode(Company);
         const passwordHash = await bcrypt.hash(password, 10);
+        const verification = buildVerificationToken();
 
         const companyId = new mongoose.Types.ObjectId();
         const userId = new mongoose.Types.ObjectId();
@@ -43,12 +47,17 @@ export const registerCompany = async (req, res, next) => {
                 passwordHash,
                 role: "admin",
                 company: companyId,
+                verificationTokenHash: verification.hash,
+                verificationExpires: verification.expires,
             }], { session });
         });
 
+        await sendVerificationEmail(user.email, verification.raw);
+
         const token = signToken(user);
-        const { passwordHash: _pw, ...safeUser } = user.toObject();
-        res.status(201).json({ token, user: safeUser, company });
+        const refreshToken = await issueRefreshToken(user);
+        const { passwordHash: _pw, verificationTokenHash, verificationExpires, ...safeUser } = user.toObject();
+        res.status(201).json({ token, refreshToken, user: safeUser, company });
     } catch (err) {
         next(err);
     } finally {

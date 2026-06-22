@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
+import ForgotPassword from './pages/ForgotPassword.jsx'
+import ResetPassword from './pages/ResetPassword.jsx'
+import VerifyEmail from './pages/VerifyEmail.jsx'
 import Layout from './components/Layout.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Events from './pages/Events.jsx'
@@ -9,13 +12,18 @@ import Shifts from './pages/Shifts.jsx'
 import Staff from './pages/Staff.jsx'
 import Assignments from './pages/Assignments.jsx'
 import Payroll from './pages/Payroll.jsx'
-import { api } from './api/client.js'
+import Profile from './pages/Profile.jsx'
+import { api, setTokens, clearTokens } from './api/client.js'
 import * as authApi from './api/auth.js'
+
+// Token-based screens reached from emailed links — they work regardless of
+// whether the visitor is signed in.
+const goHome = () => { window.history.replaceState({}, '', '/'); window.location.reload() }
 
 export default function App() {
   const [user, setUser]       = useState(null)
   const [loading, setLoading] = useState(true)
-  const [authView, setAuthView] = useState('login') // 'login' | 'register'
+  const [authView, setAuthView] = useState('login') // 'login' | 'register' | 'forgot'
 
   useEffect(() => {
     const token = localStorage.getItem('token')
@@ -37,7 +45,7 @@ export default function App() {
   }, [])
 
   const completeAuth = (res) => {
-    localStorage.setItem('token', res.token)
+    setTokens(res.token, res.refreshToken)
     setUser(res.user)
   }
 
@@ -46,10 +54,22 @@ export default function App() {
     completeAuth(res)
   }
 
-  const logout = () => {
-    localStorage.removeItem('token')
+  const logout = async () => {
+    try {
+      const refreshToken = localStorage.getItem('refreshToken')
+      if (refreshToken) await authApi.logout(refreshToken)
+    } catch {
+      // best-effort revocation; clear locally regardless
+    }
+    clearTokens()
     setUser(null)
   }
+
+  // Deep links from emails — handled before auth gating.
+  const path = window.location.pathname
+  const urlToken = new URLSearchParams(window.location.search).get('token')
+  if (path === '/verify-email') return <VerifyEmail token={urlToken} onDone={goHome} />
+  if (path === '/reset-password') return <ResetPassword token={urlToken} onDone={goHome} />
 
   if (loading) {
     return (
@@ -60,9 +80,17 @@ export default function App() {
   }
 
   if (!user) {
-    return authView === 'register'
-      ? <Register onAuth={completeAuth} onSwitchToLogin={() => setAuthView('login')} />
-      : <Login onLogin={login} onSwitchToRegister={() => setAuthView('register')} />
+    if (authView === 'register')
+      return <Register onAuth={completeAuth} onSwitchToLogin={() => setAuthView('login')} />
+    if (authView === 'forgot')
+      return <ForgotPassword onSwitchToLogin={() => setAuthView('login')} />
+    return (
+      <Login
+        onLogin={login}
+        onSwitchToRegister={() => setAuthView('register')}
+        onForgotPassword={() => setAuthView('forgot')}
+      />
+    )
   }
 
   return (
@@ -75,6 +103,7 @@ export default function App() {
           <Route path="/staff"       element={<Staff       user={user} />} />
           <Route path="/assignments" element={<Assignments user={user} />} />
           <Route path="/payroll"     element={<Payroll     user={user} />} />
+          <Route path="/profile"     element={<Profile     user={user} onUserUpdate={setUser} />} />
           <Route path="*"            element={<Navigate to="/" />} />
         </Routes>
       </Layout>
