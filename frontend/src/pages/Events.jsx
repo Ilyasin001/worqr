@@ -1,10 +1,13 @@
-import { useState } from 'react'
-import { EVENTS, fmtDate, statusBadge } from '../data/mockData.js'
+import { useState, useEffect } from 'react'
+import { fmtDate, statusBadge } from '../data/mockData.js'
+import { getEvents, createEvent, updateEvent, deleteEvent } from '../api/events.js'
 
 const EMPTY = { title: '', description: '', date: '', address: '', status: 'pending' }
 
 export default function Events({ user }) {
-  const [events, setEvents]     = useState(EVENTS)
+  const [events, setEvents]     = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState(null)
   const [search, setSearch]     = useState('')
   const [filter, setFilter]     = useState('all')
   const [modal, setModal]       = useState(null)   // null | 'create' | event obj
@@ -13,9 +16,16 @@ export default function Events({ user }) {
 
   const isAdmin = user.role === 'admin'
 
+  useEffect(() => {
+    getEvents()
+      .then(setEvents)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
   const visible = events.filter(e => {
     const matchSearch = e.title.toLowerCase().includes(search.toLowerCase()) ||
-                        e.address.toLowerCase().includes(search.toLowerCase())
+                        (e.address || '').toLowerCase().includes(search.toLowerCase())
     const matchFilter = filter === 'all' || e.status === filter
     return matchSearch && matchFilter
   })
@@ -24,19 +34,30 @@ export default function Events({ user }) {
   const openEdit   = (ev) => { setForm({ ...ev }); setModal(ev) }
   const closeModal = () => { setModal(null); setForm(EMPTY) }
 
-  const save = () => {
+  const save = async () => {
     if (!form.title || !form.date) return
-    if (modal === 'create') {
-      setEvents(prev => [...prev, { ...form, _id: `e${Date.now()}`, createdBy: 's1' }])
-    } else {
-      setEvents(prev => prev.map(e => e._id === modal._id ? { ...e, ...form } : e))
+    try {
+      if (modal === 'create') {
+        const created = await createEvent(form)
+        setEvents(prev => [...prev, created])
+      } else {
+        const updated = await updateEvent(modal._id, form)
+        setEvents(prev => prev.map(e => e._id === modal._id ? updated : e))
+      }
+      closeModal()
+    } catch (e) {
+      setError(e.message)
     }
-    closeModal()
   }
 
-  const confirmDelete = () => {
-    setEvents(prev => prev.filter(e => e._id !== deleteId))
-    setDeleteId(null)
+  const confirmDelete = async () => {
+    try {
+      await deleteEvent(deleteId)
+      setEvents(prev => prev.filter(e => e._id !== deleteId))
+      setDeleteId(null)
+    } catch (e) {
+      setError(e.message)
+    }
   }
 
   return (
@@ -48,6 +69,12 @@ export default function Events({ user }) {
         </div>
         {isAdmin && <button className="btn btn-primary" onClick={openCreate}>＋ New Event</button>}
       </div>
+
+      {error && (
+        <div style={{ background: '#FEF2F2', color: '#991B1B', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
 
       <div className="card">
         <div className="card-header">
@@ -71,7 +98,11 @@ export default function Events({ user }) {
         </div>
 
         <div className="table-wrap">
-          {visible.length === 0 ? (
+          {loading ? (
+            <div className="empty-state">
+              <p>Loading events…</p>
+            </div>
+          ) : visible.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📅</div>
               <h3>No events found</h3>

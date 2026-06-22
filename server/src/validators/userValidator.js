@@ -21,6 +21,10 @@ export const createUserValidator = [
     .trim()
     .isLength({ max: 200 }).withMessage('Address must be 200 characters or fewer'),
 
+  body('role')
+    .optional()
+    .isIn(['staff', 'admin']).withMessage('Role must be staff or admin'),
+
   body('hourlyRate')
     .optional()
     .isFloat({ min: 0 }).withMessage('Hourly rate must be a non-negative number'),

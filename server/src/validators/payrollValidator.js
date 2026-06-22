@@ -1,4 +1,4 @@
-import { body, validationResult } from 'express-validator';
+import { body, query, validationResult } from 'express-validator';
 
 // approve and finalize only take :id — no body to validate
 export const createPayrollDraftValidator = [
@@ -15,6 +15,13 @@ export const createPayrollDraftValidator = [
     .notEmpty().withMessage('Period end is required')
     .isISO8601().withMessage('Period end must be a valid ISO 8601 date')
     .toDate(),
+];
+
+export const payrollSummaryValidator = [
+  query('year')
+    .notEmpty().withMessage('Year is required')
+    .isInt({ min: 2000, max: 2100 }).withMessage('Year must be a valid year')
+    .toInt(),
 ];
 
 export const validate = (req, res, next) => {

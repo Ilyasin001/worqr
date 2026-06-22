@@ -5,8 +5,10 @@ import express from 'express';
 // the User model and bcrypt that the auth controller uses.
 const mockFindOne = jest.fn();
 const mockSave    = jest.fn();
-const MockUser    = jest.fn().mockImplementation(() => ({ save: mockSave }));
+const MockUser    = jest.fn().mockImplementation((data) => ({ ...data, save: mockSave, toObject: () => ({ ...data }) }));
 MockUser.findOne  = mockFindOne;
+
+const mockCompanyFindOne = jest.fn();
 
 const mockCompare = jest.fn();
 const mockGenSalt = jest.fn();
@@ -14,6 +16,7 @@ const mockHash    = jest.fn();
 const mockSign    = jest.fn();
 
 jest.unstable_mockModule('../../models/user.js', () => ({ default: MockUser }));
+jest.unstable_mockModule('../../models/company.js', () => ({ default: { findOne: mockCompanyFindOne } }));
 jest.unstable_mockModule('bcrypt', () => ({
   default: { compare: mockCompare, genSalt: mockGenSalt, hash: mockHash },
 }));
@@ -47,26 +50,44 @@ describe('POST /api/auth/register', () => {
   it('returns 400 when password is too weak', async () => {
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Alice', email: 'a@b.com', password: 'weak' });
+      .send({ name: 'Alice', email: 'a@b.com', password: 'weak', companyCode: 'GOOD' });
     expect(res.status).toBe(400);
   });
 
-  it('returns 400 when email is already registered', async () => {
-    mockFindOne.mockResolvedValue({ _id: 'uid1' });
+  it('returns 400 when the company code is missing', async () => {
     const res = await request(app)
       .post('/api/auth/register')
       .send({ name: 'Alice', email: 'a@b.com', password: 'Password1' });
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 when the company code is invalid', async () => {
+    mockCompanyFindOne.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Alice', email: 'a@b.com', password: 'Password1', companyCode: 'BAD' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 409 when email is already registered', async () => {
+    mockCompanyFindOne.mockResolvedValue({ _id: 'co1' });
+    mockFindOne.mockResolvedValue({ _id: 'uid1' });
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Alice', email: 'a@b.com', password: 'Password1', companyCode: 'GOOD' });
+    expect(res.status).toBe(409);
+  });
+
   it('returns 201 on successful registration', async () => {
+    mockCompanyFindOne.mockResolvedValue({ _id: 'co1' });
     mockFindOne.mockResolvedValue(null);
     mockGenSalt.mockResolvedValue('salt');
     mockHash.mockResolvedValue('hashedpw');
     mockSave.mockResolvedValue(undefined);
+    mockSign.mockReturnValue('jwt-token');
     const res = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Alice', email: 'a@b.com', password: 'Password1' });
+      .send({ name: 'Alice', email: 'a@b.com', password: 'Password1', companyCode: 'GOOD' });
     expect(res.status).toBe(201);
   });
 });

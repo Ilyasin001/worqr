@@ -1,7 +1,7 @@
 import express from "express"
 import { createPayrollDraft, finalizePayroll, approvePayroll, getPayrollBatches, getMyPayrollHistory, getPayrollSummary } from "../controllers/payrollController.js";
 import { protect, adminOnly } from "../middleware/authMiddleware.js";
-import { createPayrollDraftValidator, validate } from "../validators/payrollValidator.js";
+import { createPayrollDraftValidator, payrollSummaryValidator, validate } from "../validators/payrollValidator.js";
 
 const router = express.Router();
 
@@ -19,6 +19,6 @@ router.post("/:id/finalize", finalizePayroll);
 
 router.get("/batches", getPayrollBatches);
 
-router.get("/summary", getPayrollSummary);
+router.get("/summary", payrollSummaryValidator, validate, getPayrollSummary);
 
 export default router;

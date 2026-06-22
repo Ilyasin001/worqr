@@ -1,16 +1,42 @@
-import { useState } from 'react'
-import { STAFF, initials } from '../data/mockData.js'
+import { useState, useEffect } from 'react'
+import { initials } from '../data/mockData.js'
+import { getStaff, createStaff, updateStaff, deleteStaff } from '../api/staff.js'
+import { getMyCompany, rotateCode } from '../api/company.js'
 
 const COLORS = ['indigo','blue','green','orange','pink','teal','red','purple']
-const EMPTY  = { name: '', email: '', role: 'staff', hourlyRate: 12.00 }
+const EMPTY  = { name: '', email: '', role: 'staff', hourlyRate: 12.00, password: '' }
 
 export default function Staff({ user }) {
-  const [staff, setStaff] = useState(STAFF)
-  const [search, setSearch] = useState('')
-  const [modal, setModal]   = useState(null)
-  const [form, setForm]     = useState(EMPTY)
+  const [staff, setStaff]     = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState(null)
+  const [search, setSearch]   = useState('')
+  const [modal, setModal]     = useState(null)
+  const [form, setForm]       = useState(EMPTY)
 
   const isAdmin = user.role === 'admin'
+  const [company, setCompany] = useState(null)
+
+  useEffect(() => {
+    getStaff()
+      .then(setStaff)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (isAdmin) getMyCompany().then(setCompany).catch(() => {})
+  }, [isAdmin])
+
+  const handleRotate = async () => {
+    if (!window.confirm('Rotate the join code? The current code will stop working.')) return
+    try {
+      const { code } = await rotateCode()
+      setCompany(c => ({ ...c, code }))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
 
   const visible = staff.filter(s =>
     !search ||
@@ -19,20 +45,34 @@ export default function Staff({ user }) {
   )
 
   const openCreate = () => { setForm(EMPTY); setModal('create') }
-  const openEdit   = (s)  => { setForm({ ...s }); setModal(s) }
+  const openEdit   = (s)  => { setForm({ ...s, password: '' }); setModal(s) }
   const closeModal = () => { setModal(null); setForm(EMPTY) }
 
-  const save = () => {
+  const save = async () => {
     if (!form.name || !form.email) return
-    if (modal === 'create') {
-      setStaff(prev => [...prev, { ...form, _id: `s${Date.now()}`, color: COLORS[prev.length % COLORS.length] }])
-    } else {
-      setStaff(prev => prev.map(s => s._id === modal._id ? { ...s, ...form } : s))
+    try {
+      if (modal === 'create') {
+        const created = await createStaff({ ...form })
+        setStaff(prev => [...prev, { ...created, color: COLORS[prev.length % COLORS.length] }])
+      } else {
+        const { name, email, role, hourlyRate } = form
+        const updated = await updateStaff(modal._id, { name, email, role, hourlyRate })
+        setStaff(prev => prev.map(s => s._id === modal._id ? { ...s, ...updated } : s))
+      }
+      closeModal()
+    } catch (e) {
+      setError(e.message)
     }
-    closeModal()
   }
 
-  const del = (id) => setStaff(prev => prev.filter(s => s._id !== id))
+  const del = async (id) => {
+    try {
+      await deleteStaff(id)
+      setStaff(prev => prev.filter(s => s._id !== id))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
 
   const admins = visible.filter(s => s.role === 'admin')
   const crew   = visible.filter(s => s.role === 'staff')
@@ -44,9 +84,9 @@ export default function Staff({ user }) {
           {title} ({members.length})
         </div>
         <div className="staff-grid">
-          {members.map(s => (
+          {members.map((s, index) => (
             <div className="staff-card" key={s._id}>
-              <div className={`staff-card-avatar avatar-${s.color}`}>{initials(s.name)}</div>
+              <div className={`staff-card-avatar avatar-${s.color || COLORS[index % COLORS.length]}`}>{initials(s.name)}</div>
               <div className="staff-card-name">{s.name}</div>
               <div className="staff-card-email">{s.email}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -76,6 +116,31 @@ export default function Staff({ user }) {
         {isAdmin && <button className="btn btn-primary" onClick={openCreate}>＋ Add Staff</button>}
       </div>
 
+      {error && (
+        <div style={{ background: '#FEF2F2', color: '#991B1B', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+
+      {isAdmin && company?.code && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-body" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Company join code
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+                Share this with new staff so they can register under {company.name}.
+              </div>
+            </div>
+            <code style={{ fontSize: 20, fontWeight: 700, letterSpacing: '2px', background: 'var(--bg)', padding: '6px 14px', borderRadius: 6 }}>
+              {company.code}
+            </code>
+            <button className="btn btn-secondary btn-sm" onClick={handleRotate}>🔄 Rotate</button>
+          </div>
+        </div>
+      )}
+
       <div className="toolbar">
         <div className="search-box">
           <span className="search-icon">🔍</span>
@@ -86,7 +151,11 @@ export default function Staff({ user }) {
         </div>
       </div>
 
-      {visible.length === 0 ? (
+      {loading ? (
+        <div className="card">
+          <div className="empty-state"><p>Loading staff…</p></div>
+        </div>
+      ) : visible.length === 0 ? (
         <div className="card">
           <div className="empty-state">
             <div className="empty-state-icon">👥</div>
@@ -117,6 +186,12 @@ export default function Staff({ user }) {
                 <label className="form-label">Email *</label>
                 <input className="form-input" type="email" placeholder="jane@worqr.com" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} />
               </div>
+              {modal === 'create' && (
+                <div className="form-group">
+                  <label className="form-label">Password *</label>
+                  <input className="form-input" type="password" placeholder="••••••••" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))} />
+                </div>
+              )}
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Role</label>

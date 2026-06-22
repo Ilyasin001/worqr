@@ -16,10 +16,10 @@ export const registerValidator = [
     .notEmpty().withMessage('Password is required')
     .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain uppercase, lowercase, and number'),
-  
-  body('role')
-    .optional()
-    .isIn(['staff', 'admin']).withMessage('Role must be staff or admin')
+
+  body('companyCode')
+    .trim()
+    .notEmpty().withMessage('Company code is required')
 ];
 
 export const loginValidator = [

@@ -11,6 +11,12 @@ const shiftSchema = new mongoose.Schema({
         ref: 'Event',
         required: true
     },
+    company: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Company',
+        required: true,
+        index: true
+    },
     startTime: { 
         type: Date,
         required: true
@@ -25,11 +31,10 @@ const shiftSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-shiftSchema.pre('save', function(next) {
+shiftSchema.pre('save', function() {
     if (this.endTime <= this.startTime) {
-        return next(new Error('End time must be after start time'));
+        throw Object.assign(new Error('End time must be after start time'), { statusCode: 400 });
     }
-    next();
 });
 
 const Shift = mongoose.model('Shift', shiftSchema);

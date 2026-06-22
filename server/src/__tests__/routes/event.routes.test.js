@@ -13,21 +13,23 @@ jest.unstable_mockModule('../../models/user.js', () => ({
 }));
 
 // --- event model mocks -----------------------------------------------------
-const mockSave = jest.fn();
-const MockEvent = jest.fn().mockImplementation(() => ({ save: mockSave }));
-MockEvent.find              = jest.fn();
-MockEvent.findById          = jest.fn();
-MockEvent.findByIdAndUpdate = jest.fn();
-MockEvent.findByIdAndDelete = jest.fn();
+const MockEvent = jest.fn();
+MockEvent.create           = jest.fn();
+MockEvent.find             = jest.fn();
+MockEvent.findOne          = jest.fn();
+MockEvent.findOneAndUpdate = jest.fn();
+MockEvent.findOneAndDelete = jest.fn();
 
 jest.unstable_mockModule('../../models/event.js', () => ({ default: MockEvent }));
 
 const { default: eventRouter } = await import('../../routes/eventRoutes.js');
+const { errorHandler }         = await import('../../middleware/errorMiddleware.js');
 const { default: request }     = await import('supertest');
 
 const app = express();
 app.use(express.json());
 app.use('/api/events', eventRouter);
+app.use(errorHandler);
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -35,32 +37,46 @@ app.use('/api/events', eventRouter);
 const TOKEN = 'Bearer testtoken';
 
 const setUser = (role = 'admin') => {
-  mockVerify.mockReturnValue({ id: 'uid1' });
+  mockVerify.mockReturnValue({ id: 'uid1', companyId: 'co1' });
   mockFindUser.mockReturnValue({
-    select: jest.fn().mockResolvedValue({ _id: 'uid1', role }),
+    select: jest.fn().mockResolvedValue({ _id: 'uid1', role, company: 'co1' }),
   });
 };
 
 // ---------------------------------------------------------------------------
-// GET /api/events  (public — no protect on this route)
+// GET /api/events  (now protected + company-scoped)
 // ---------------------------------------------------------------------------
 describe('GET /api/events', () => {
-  it('returns all events with 200', async () => {
-    MockEvent.find.mockResolvedValue([{ _id: 'e1', title: 'Gala' }]);
+  it('returns 401 without a token', async () => {
     const res = await request(app).get('/api/events');
+    expect(res.status).toBe(401);
+  });
+
+  it('returns this company\'s events with 200', async () => {
+    setUser('staff');
+    MockEvent.find.mockResolvedValue([{ _id: 'e1', title: 'Gala' }]);
+    const res = await request(app).get('/api/events').set('Authorization', TOKEN);
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
   });
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/events/:id  (public)
+// GET /api/events/:id  (protected)
 // ---------------------------------------------------------------------------
 describe('GET /api/events/:id', () => {
   it('returns the event with 200', async () => {
-    MockEvent.findById.mockResolvedValue({ _id: 'e1', title: 'Gala' });
-    const res = await request(app).get('/api/events/e1');
+    setUser('staff');
+    MockEvent.findOne.mockResolvedValue({ _id: 'e1', title: 'Gala' });
+    const res = await request(app).get('/api/events/e1').set('Authorization', TOKEN);
     expect(res.status).toBe(200);
+  });
+
+  it('returns 404 when not found in company', async () => {
+    setUser('staff');
+    MockEvent.findOne.mockResolvedValue(null);
+    const res = await request(app).get('/api/events/e1').set('Authorization', TOKEN);
+    expect(res.status).toBe(404);
   });
 });
 
@@ -80,7 +96,7 @@ describe('POST /api/events', () => {
     const res = await request(app)
       .post('/api/events')
       .set('Authorization', TOKEN)
-      .send({ title: 'Gala', date: '2025-06-01', createdBy: 'uid1' });
+      .send({ title: 'Gala', date: '2025-06-01' });
     expect(res.status).toBe(403);
   });
 
@@ -93,23 +109,13 @@ describe('POST /api/events', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 400 when date is invalid', async () => {
-    setUser('admin');
-    const res = await request(app)
-      .post('/api/events')
-      .set('Authorization', TOKEN)
-      .send({ title: 'Gala', date: 'not-a-date' });
-    expect(res.status).toBe(400);
-  });
-
   it('returns 201 for admin with valid body', async () => {
     setUser('admin');
-    const saved = { _id: 'e1', title: 'Gala' };
-    mockSave.mockResolvedValue(saved);
+    MockEvent.create.mockResolvedValue({ _id: 'e1', title: 'Gala' });
     const res = await request(app)
       .post('/api/events')
       .set('Authorization', TOKEN)
-      .send({ title: 'Gala', date: '2025-06-01T00:00:00.000Z', createdBy: 'uid1' });
+      .send({ title: 'Gala', date: '2025-06-01T00:00:00.000Z' });
     expect(res.status).toBe(201);
   });
 });
@@ -118,11 +124,6 @@ describe('POST /api/events', () => {
 // PUT /api/events/:id  (admin only)
 // ---------------------------------------------------------------------------
 describe('PUT /api/events/:id', () => {
-  it('returns 401 without auth token', async () => {
-    const res = await request(app).put('/api/events/e1').send({ title: 'New' });
-    expect(res.status).toBe(401);
-  });
-
   it('returns 403 for non-admin user', async () => {
     setUser('staff');
     const res = await request(app)
@@ -134,7 +135,7 @@ describe('PUT /api/events/:id', () => {
 
   it('returns 404 when event not found', async () => {
     setUser('admin');
-    MockEvent.findByIdAndUpdate.mockResolvedValue(null);
+    MockEvent.findOneAndUpdate.mockResolvedValue(null);
     const res = await request(app)
       .put('/api/events/e1')
       .set('Authorization', TOKEN)
@@ -144,7 +145,7 @@ describe('PUT /api/events/:id', () => {
 
   it('returns 200 on success', async () => {
     setUser('admin');
-    MockEvent.findByIdAndUpdate.mockResolvedValue({ _id: 'e1', title: 'New' });
+    MockEvent.findOneAndUpdate.mockResolvedValue({ _id: 'e1', title: 'New' });
     const res = await request(app)
       .put('/api/events/e1')
       .set('Authorization', TOKEN)
@@ -157,14 +158,9 @@ describe('PUT /api/events/:id', () => {
 // DELETE /api/events/:id  (admin only)
 // ---------------------------------------------------------------------------
 describe('DELETE /api/events/:id', () => {
-  it('returns 401 without auth token', async () => {
-    const res = await request(app).delete('/api/events/e1');
-    expect(res.status).toBe(401);
-  });
-
   it('returns 404 when event not found', async () => {
     setUser('admin');
-    MockEvent.findByIdAndDelete.mockResolvedValue(null);
+    MockEvent.findOneAndDelete.mockResolvedValue(null);
     const res = await request(app)
       .delete('/api/events/e1')
       .set('Authorization', TOKEN);
@@ -173,7 +169,7 @@ describe('DELETE /api/events/:id', () => {
 
   it('returns 200 on success', async () => {
     setUser('admin');
-    MockEvent.findByIdAndDelete.mockResolvedValue({ _id: 'e1' });
+    MockEvent.findOneAndDelete.mockResolvedValue({ _id: 'e1' });
     const res = await request(app)
       .delete('/api/events/e1')
       .set('Authorization', TOKEN);

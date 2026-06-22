@@ -28,8 +28,15 @@ const config = {
   // Only scan src for tests
   roots: ['<rootDir>/src'],
 
+  // Only treat *.test.js files as test suites (excludes helpers living in __tests__ dirs)
+  testMatch: ['**/*.test.js'],
+
   // Verbose output so each test name is printed
   verbose: true,
+
+  // Integration suites spin up an in-memory MongoDB replica set in beforeAll;
+  // the default 5s hook timeout is too tight for replica-set startup.
+  testTimeout: 30000,
 };
 
 export default config;

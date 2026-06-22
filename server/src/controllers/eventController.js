@@ -1,57 +1,73 @@
-import express from "express";
-import event from "../models/event.js"
+import Event from "../models/event.js";
+import { AppError } from "../utils/appError.js";
 
-export const createEvent = async (req,res) => {
-    try{
-        const {title, description, date, address, createdBy} = req.body;
-        const newEvent = new event({title, description, date, address, createdBy});
-        const savedEvent = await newEvent.save();
-        res.status(201).json(savedEvent);
-    }
-    catch(error){
-        res.status(400).json({message : error.message})
-    }
-};
-
-export const getEvents = async (req,res) => {
-    try{
-        const events = await event.find();
-        res.status(200).json(events);
-    }
-    catch(error){
-        res.status(500).json({ message: error.message });
-    }
-};
-
-export const getEventbyId = async (req,res) => {
+export const createEvent = async (req, res, next) => {
     try {
-        const findEvent = await event.findById(req.params.id);
+        const { title, description, date, address } = req.body;
+        const newEvent = await Event.create({
+            title, description, date, address,
+            createdBy: req.user._id,
+            company: req.companyId,
+        });
+        res.status(201).json(newEvent);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getEvents = async (req, res, next) => {
+    try {
+        const events = await Event.find({ company: req.companyId });
+        res.status(200).json(events);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getEventbyId = async (req, res, next) => {
+    try {
+        const findEvent = await Event.findOne({ _id: req.params.id, company: req.companyId });
+        if (!findEvent) {
+            throw new AppError("Event not found", 404);
+        }
         res.status(200).json(findEvent);
     } catch (error) {
-       res.status(500).json({message: error.message }); 
+        next(error);
     }
 };
 
-export const updateEvent = async (req,res) => {
+export const updateEvent = async (req, res, next) => {
     try {
-        const updateEvent = await event.findByIdAndUpdate(req.params.id, req.body, {new : true});
-        if (!updateEvent){
-            return res.status(404).json({ message: "Event not found" });
+        const { title, description, date, address, status } = req.body;
+        const updates = {};
+        if (title !== undefined) updates.title = title;
+        if (description !== undefined) updates.description = description;
+        if (date !== undefined) updates.date = date;
+        if (address !== undefined) updates.address = address;
+        if (status !== undefined) updates.status = status;
+
+        const updated = await Event.findOneAndUpdate(
+            { _id: req.params.id, company: req.companyId },
+            updates,
+            { new: true, runValidators: true }
+        );
+        if (!updated) {
+            throw new AppError("Event not found", 404);
         }
-        res.status(200).json(updateEvent);
+        res.status(200).json(updated);
     } catch (error) {
-        res.status(500).json({ message : error.message });
+        next(error);
     }
 };
 
-export const deleteEvent = async (req,res) => {
+export const deleteEvent = async (req, res, next) => {
     try {
-        const deleteEvent = await event.findByIdAndDelete(req.params.id);
-        if(!deleteEvent){
-            return res.status(404).json({ message: "Event not found"})
+        const deleted = await Event.findOneAndDelete({ _id: req.params.id, company: req.companyId });
+        if (!deleted) {
+            throw new AppError("Event not found", 404);
         }
-        res.status(200).json({ message : "Event successfully deleted"});
+        res.status(200).json({ message: "Event successfully deleted" });
     } catch (error) {
-        res.status(500).json({ message : error.message });
+        next(error);
     }
 };

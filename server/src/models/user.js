@@ -24,6 +24,12 @@ const userSchema = new mongoose.Schema({
         default: "staff",
         required: true
     },
+    company: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Company",
+        required: true,
+        index: true
+    },
     hourlyRate: {
         type: Number,
         required: false,

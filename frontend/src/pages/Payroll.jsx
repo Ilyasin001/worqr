@@ -1,44 +1,62 @@
-import { useState } from 'react'
-import { PAYROLL_BATCHES, STAFF, getStaff, fmtDate, statusBadge, initials } from '../data/mockData.js'
+import { useState, useEffect } from 'react'
+import { fmtDate, statusBadge, initials } from '../data/mockData.js'
+import { getBatches, getMyHistory, createDraft as apiCreateDraft, approve, finalize } from '../api/payroll.js'
+import { getStaff } from '../api/staff.js'
 
 const STATUS_ORDER = ['draft', 'approved', 'paid']
 
 export default function Payroll({ user }) {
-  const [batches, setBatches] = useState(PAYROLL_BATCHES)
+  const [batches, setBatches] = useState([])
+  const [staff, setStaff]     = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError]     = useState(null)
   const [tab, setTab]         = useState(user.role === 'admin' ? 'all' : 'mine')
   const [modal, setModal]     = useState(false)
   const [form, setForm]       = useState({ staffId: '', periodStart: '', periodEnd: '' })
 
   const isAdmin = user.role === 'admin'
 
-  const visible = tab === 'mine'
-    ? batches.filter(b => b.staff === 's2') // simulate current staff
-    : batches
-
-  const advance = (id) => {
-    setBatches(prev => prev.map(b => {
-      if (b._id !== id) return b
-      const next = STATUS_ORDER[STATUS_ORDER.indexOf(b.status) + 1]
-      return next ? { ...b, status: next, processedAt: new Date().toISOString().slice(0,10) } : b
-    }))
+  const loadBatches = () => {
+    const fetcher = tab === 'mine' ? getMyHistory : getBatches
+    return fetcher().then(setBatches).catch(e => setError(e.message))
   }
 
-  const createDraft = () => {
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([loadBatches(), getStaff().then(setStaff).catch(e => setError(e.message))])
+      .finally(() => setLoading(false))
+  }, [tab])
+
+  const visible = batches
+
+  const advance = async (id) => {
+    const batch = batches.find(b => b._id === id)
+    if (!batch) return
+    try {
+      let updated
+      if (batch.status === 'draft') {
+        updated = await approve(id)
+      } else if (batch.status === 'approved') {
+        updated = await finalize(id)
+      } else {
+        return
+      }
+      setBatches(prev => prev.map(b => b._id === id ? updated : b))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  const handleCreateDraft = async () => {
     if (!form.staffId || !form.periodStart || !form.periodEnd) return
-    const staff = getStaff(form.staffId)
-    setBatches(prev => [...prev, {
-      _id: `pb${Date.now()}`,
-      staff: form.staffId,
-      periodStart: form.periodStart,
-      periodEnd: form.periodEnd,
-      totalHours: 0,
-      totalPay: 0,
-      assignments: [],
-      status: 'draft',
-      processedAt: null,
-    }])
-    setModal(false)
-    setForm({ staffId: '', periodStart: '', periodEnd: '' })
+    try {
+      const created = await apiCreateDraft(form)
+      setBatches(prev => [...prev, created])
+      setModal(false)
+      setForm({ staffId: '', periodStart: '', periodEnd: '' })
+    } catch (e) {
+      setError(e.message)
+    }
   }
 
   const statusLabel = (s) => ({ draft: 'Draft', approved: 'Approved', paid: 'Paid' }[s] || s)
@@ -68,6 +86,12 @@ export default function Payroll({ user }) {
         {isAdmin && <button className="btn btn-primary" onClick={() => setModal(true)}>＋ New Draft</button>}
       </div>
 
+      {error && (
+        <div style={{ background: '#FEF2F2', color: '#991B1B', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+
       {/* ── TABS ── */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
         {isAdmin && (
@@ -93,8 +117,8 @@ export default function Payroll({ user }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 20 }}>
           {[
             { label: 'Total Batches', value: batches.length, icon: '📦', bg: '#EDE9FE' },
-            { label: 'Total Hours', value: `${batches.reduce((s,b) => s + b.totalHours, 0).toFixed(1)}h`, icon: '⏱', bg: '#DBEAFE' },
-            { label: 'Total Pay', value: `£${batches.reduce((s,b) => s + b.totalPay, 0).toFixed(2)}`, icon: '💷', bg: '#D1FAE5' },
+            { label: 'Total Hours', value: `${batches.reduce((s,b) => s + (b.totalHours || 0), 0).toFixed(1)}h`, icon: '⏱', bg: '#DBEAFE' },
+            { label: 'Total Pay', value: `£${batches.reduce((s,b) => s + (b.totalPay || 0), 0).toFixed(2)}`, icon: '💷', bg: '#D1FAE5' },
           ].map(({ label, value, icon, bg }) => (
             <div key={label} className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
               <div className="stat-icon" style={{ background: bg, width: 40, height: 40 }}>{icon}</div>
@@ -108,7 +132,11 @@ export default function Payroll({ user }) {
       )}
 
       {/* ── BATCH LIST ── */}
-      {visible.length === 0 ? (
+      {loading ? (
+        <div className="card">
+          <div className="empty-state"><p>Loading payroll…</p></div>
+        </div>
+      ) : visible.length === 0 ? (
         <div className="card">
           <div className="empty-state">
             <div className="empty-state-icon">💷</div>
@@ -119,14 +147,14 @@ export default function Payroll({ user }) {
       ) : (
         <div className="batch-list">
           {visible.map(b => {
-            const staff  = getStaff(b.staff)
+            const member = staff.find(s => s._id === (b.staff?._id || b.staff))
             const canAdv = isAdmin && b.status !== 'paid'
             return (
               <div className="payroll-batch" key={b._id}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                  <div className={`avatar avatar-${staff?.color || 'blue'}`}>{staff ? initials(staff.name) : '?'}</div>
+                  <div className={`avatar avatar-${member?.color || 'blue'}`}>{member ? initials(member.name) : '?'}</div>
                   <div className="batch-info">
-                    <div className="batch-name">{staff?.name || 'Unknown Staff'}</div>
+                    <div className="batch-name">{member?.name || 'Unknown Staff'}</div>
                     <div className="batch-meta">
                       {fmtDate(b.periodStart)} – {fmtDate(b.periodEnd)}
                       {b.processedAt && ` · Processed ${fmtDate(b.processedAt)}`}
@@ -139,15 +167,15 @@ export default function Payroll({ user }) {
 
                 <div className="batch-amounts">
                   <div className="amount-block">
-                    <div className="amount-value">{b.totalHours.toFixed(1)}h</div>
+                    <div className="amount-value">{(b.totalHours || 0).toFixed(1)}h</div>
                     <div className="amount-label">Hours</div>
                   </div>
                   <div className="amount-block">
-                    <div className="amount-value" style={{ color: 'var(--success)' }}>£{b.totalPay.toFixed(2)}</div>
+                    <div className="amount-value" style={{ color: 'var(--success)' }}>£{(b.totalPay || 0).toFixed(2)}</div>
                     <div className="amount-label">Total Pay</div>
                   </div>
                   <div className="amount-block">
-                    <div className="amount-value">{b.assignments.length}</div>
+                    <div className="amount-value">{Array.isArray(b.assignments) ? b.assignments.length : 0}</div>
                     <div className="amount-label">Assignments</div>
                   </div>
                 </div>
@@ -182,7 +210,7 @@ export default function Payroll({ user }) {
                 <label className="form-label">Staff Member *</label>
                 <select className="form-select" value={form.staffId} onChange={e => setForm(f => ({...f, staffId: e.target.value}))}>
                   <option value="">Select staff…</option>
-                  {STAFF.filter(s => s.role === 'staff').map(s => (
+                  {staff.filter(s => s.role === 'staff').map(s => (
                     <option key={s._id} value={s._id}>{s.name} — £{s.hourlyRate}/hr</option>
                   ))}
                 </select>
@@ -203,7 +231,7 @@ export default function Payroll({ user }) {
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setModal(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={createDraft} disabled={!form.staffId || !form.periodStart || !form.periodEnd}>
+              <button className="btn btn-primary" onClick={handleCreateDraft} disabled={!form.staffId || !form.periodStart || !form.periodEnd}>
                 Create Draft
               </button>
             </div>

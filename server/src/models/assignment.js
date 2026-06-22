@@ -11,6 +11,12 @@ const assignmentSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    company: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Company',
+        required: true,
+        index: true
+    },
     breakDuration: { // in minutes
         type: Number,
         default: 0,
@@ -41,11 +47,10 @@ assignmentSchema.index(
   { unique: true }
 );
 
-assignmentSchema.pre('save', function(next) {
+assignmentSchema.pre('save', function() {
     if (this.actualStartTime && this.actualEndTime && this.actualEndTime <= this.actualStartTime) {
-        return next(new Error('Actual end time must be after actual start time'));
+        throw Object.assign(new Error('Actual end time must be after actual start time'), { statusCode: 400 });
     }
-    next();
 });
 
 const Assignment = mongoose.model("Assignment", assignmentSchema);

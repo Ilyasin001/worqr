@@ -1,55 +1,96 @@
-import shift from "../models/shift.js";
+import Shift from "../models/shift.js";
+import Event from "../models/event.js";
+import User from "../models/user.js";
+import { AppError } from "../utils/appError.js";
 
-export const createShift = async (req, res) => {
-    try {
-        const {managerId, startTime, endTime, eventId, confirmed} = req.body;
-        const newShift = new shift({managerId, startTime, endTime, eventId, confirmed});
-        const savedShift = await newShift.save();
-        res.status(201).json(savedShift);
-    } catch (error) {
-        res.status(400).json({ message: error.message });
+// Verifies the event + manager both belong to the caller's company.
+const assertShiftRefsInCompany = async (companyId, eventId, managerId) => {
+    const event = await Event.findOne({ _id: eventId, company: companyId });
+    if (!event) {
+        throw new AppError("Event not found in your company", 400);
+    }
+    const manager = await User.findOne({ _id: managerId, company: companyId });
+    if (!manager) {
+        throw new AppError("Manager not found in your company", 400);
     }
 };
-export const getShifts = async (req, res) => {
+
+export const createShift = async (req, res, next) => {
     try {
-        const shifts = await shift.find();
+        const { managerId, startTime, endTime, eventId, confirmed } = req.body;
+        await assertShiftRefsInCompany(req.companyId, eventId, managerId);
+
+        const newShift = await Shift.create({
+            managerId, startTime, endTime, eventId, confirmed,
+            company: req.companyId,
+        });
+        res.status(201).json(newShift);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getShifts = async (req, res, next) => {
+    try {
+        const shifts = await Shift.find({ company: req.companyId });
         res.status(200).json(shifts);
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
-export const getShiftById = async (req, res) => {
+export const getShiftById = async (req, res, next) => {
     try {
-        const foundShift = await shift.findById(req.params.id);
+        const foundShift = await Shift.findOne({ _id: req.params.id, company: req.companyId });
         if (!foundShift) {
-            return res.status(404).json({ message: "Shift not found" });
+            throw new AppError("Shift not found", 404);
         }
         res.status(200).json(foundShift);
-    }
-    catch (error) {
-        res.status(500).json({ message: error.message });
+    } catch (error) {
+        next(error);
     }
 };
-export const updateShift = async (req, res) => {
+
+export const updateShift = async (req, res, next) => {
     try {
-        const updatedShift = await shift.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const { managerId, eventId } = req.body;
+        if (managerId || eventId) {
+            const existing = await Shift.findOne({ _id: req.params.id, company: req.companyId });
+            if (!existing) {
+                throw new AppError("Shift not found", 404);
+            }
+            await assertShiftRefsInCompany(
+                req.companyId,
+                eventId ?? existing.eventId,
+                managerId ?? existing.managerId
+            );
+        }
+
+        // Never let the body relocate a record to another tenant.
+        const { company, _id, ...updates } = req.body;
+
+        const updatedShift = await Shift.findOneAndUpdate(
+            { _id: req.params.id, company: req.companyId },
+            updates,
+            { new: true, runValidators: true }
+        );
         if (!updatedShift) {
-            return res.status(404).json({ message: "Shift not found" });
+            throw new AppError("Shift not found", 404);
         }
         res.status(200).json(updatedShift);
     } catch (error) {
-        res.status(400).json({ message: error.message });
+        next(error);
     }
 };
-export const deleteShift = async (req, res) => {
+
+export const deleteShift = async (req, res, next) => {
     try {
-        const deletedShift = await shift.findByIdAndDelete(req.params.id);
+        const deletedShift = await Shift.findOneAndDelete({ _id: req.params.id, company: req.companyId });
         if (!deletedShift) {
-            return res.status(404).json({ message: "Shift not found" });
+            throw new AppError("Shift not found", 404);
         }
         res.status(200).json({ message: "Shift deleted successfully" });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };

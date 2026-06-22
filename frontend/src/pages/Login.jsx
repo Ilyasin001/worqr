@@ -1,17 +1,24 @@
 import { useState } from 'react'
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, onSwitchToRegister }) {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [error, setError]       = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!email || !password) { setError('Please enter both email and password.'); return }
-    onLogin(email)
+    setSubmitting(true)
+    setError('')
+    try {
+      await onLogin(email, password)
+    } catch (err) {
+      setError(err.message || 'Login failed. Check your credentials.')
+    } finally {
+      setSubmitting(false)
+    }
   }
-
-  const fill = (e, p) => { setEmail(e); setPassword(p); setError('') }
 
   return (
     <div className="login-page">
@@ -54,24 +61,19 @@ export default function Login({ onLogin }) {
             </div>
           )}
 
-          <button type="submit" className="login-btn">Sign in →</button>
+          <button type="submit" className="login-btn" disabled={submitting}>
+            {submitting ? 'Signing in…' : 'Sign in →'}
+          </button>
         </form>
 
-        <div className="login-hint">
-          <strong>Prototype credentials</strong>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
-            <div>Admin view: <code>admin@worqr.com</code> / any password</div>
-            <div>Staff view: <code>staff@worqr.com</code> / any password</div>
-          </div>
-          <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
-            <button className="btn btn-secondary btn-sm" onClick={() => fill('admin@worqr.com', 'Password1')}>
-              Fill Admin
+        {onSwitchToRegister && (
+          <p style={{ textAlign: 'center', marginTop: 16, fontSize: 13, color: 'var(--text-muted)' }}>
+            New here?{' '}
+            <button type="button" className="link-button" onClick={onSwitchToRegister}>
+              Create or join a company
             </button>
-            <button className="btn btn-secondary btn-sm" onClick={() => fill('staff@worqr.com', 'Password1')}>
-              Fill Staff
-            </button>
-          </div>
-        </div>
+          </p>
+        )}
       </div>
     </div>
   )

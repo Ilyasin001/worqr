@@ -1,22 +1,29 @@
 import PayrollBatch from "../models/payrollBatch.js";
 import { calculatePayrollPreview } from "../services/payrollService.js";
 import Assignment from "../models/assignment.js";
+import User from "../models/user.js";
+import { AppError } from "../utils/appError.js";
 import mongoose from "mongoose";
 
 export const createPayrollDraft = async (req, res, next) => {
     try {
         const { staffId, periodStart, periodEnd } = req.body;
+        const start = new Date(periodStart);
+        const end = new Date(periodEnd);
 
-        const preview = await calculatePayrollPreview(
-            staffId,
-            new Date(periodStart),
-            new Date(periodEnd)
-        );
+        // Staff member must belong to the admin's company.
+        const staff = await User.findOne({ _id: staffId, company: req.companyId });
+        if (!staff) {
+            throw new AppError("Staff member not found in your company", 400);
+        }
+
+        const preview = await calculatePayrollPreview(staffId, start, end);
 
         const existing = await PayrollBatch.findOne({
             staff: staffId,
-            periodStart,
-            periodEnd,
+            company: req.companyId,
+            periodStart: { $lte: end },
+            periodEnd: { $gte: start },
             status: { $in: ["draft", "approved"] }
         });
 
@@ -28,6 +35,7 @@ export const createPayrollDraft = async (req, res, next) => {
 
         const batch = await PayrollBatch.create({
             staff: staffId,
+            company: req.companyId,
             periodStart,
             periodEnd,
             totalHours: preview.totalHours,
@@ -45,7 +53,7 @@ export const createPayrollDraft = async (req, res, next) => {
 
 export const approvePayroll = async (req, res, next) => {
     try {
-        const batch = await PayrollBatch.findById(req.params.id);
+        const batch = await PayrollBatch.findOne({ _id: req.params.id, company: req.companyId });
 
         if (!batch) {
             return res.status(404).json({ message: "Batch not found" });
@@ -68,7 +76,7 @@ export const approvePayroll = async (req, res, next) => {
 
 export const finalizePayroll = async (req, res, next) => {
     try {
-        const batch = await PayrollBatch.findById(req.params.id);
+        const batch = await PayrollBatch.findOne({ _id: req.params.id, company: req.companyId });
 
         if (!batch) {
             return res.status(404).json({ message: "Batch not found" });
@@ -109,7 +117,7 @@ export const getPayrollBatches = async (req, res, next) => {
     try {
         const { staffId, start, end } = req.query;
 
-        const filter = {};
+        const filter = { company: req.companyId };
 
         if (staffId) {
             filter.staff = staffId;
@@ -134,6 +142,7 @@ export const getMyPayrollHistory = async (req, res, next) => {
     try {
         const batches = await PayrollBatch.find({
             staff: req.user._id,
+            company: req.companyId,
             status: "paid"
         }).sort({ periodStart: -1 });
 
@@ -147,15 +156,16 @@ export const getPayrollSummary = async (req, res, next) => {
     try {
         const { year } = req.query;
 
-        const startOfYear = new Date(`${year}-01-01`);
-        const endOfYear = new Date(`${year}-12-31`);
+        const startOfYear = new Date(Date.UTC(Number(year), 0, 1));
+        const startOfNextYear = new Date(Date.UTC(Number(year) + 1, 0, 1));
 
         const summary = await PayrollBatch.aggregate([
             {
                 $match: {
+                    company: new mongoose.Types.ObjectId(req.companyId),
                     status: "paid",
                     periodStart: { $gte: startOfYear },
-                    periodEnd: { $lte: endOfYear }
+                    periodEnd: { $lt: startOfNextYear }
                 }
             },
             {

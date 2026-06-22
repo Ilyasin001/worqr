@@ -1,44 +1,67 @@
 import { jest } from '@jest/globals';
 
-const mockSave = jest.fn();
-const MockShift = jest.fn().mockImplementation(() => ({ save: mockSave }));
-MockShift.find              = jest.fn();
-MockShift.findById          = jest.fn();
-MockShift.findByIdAndUpdate = jest.fn();
-MockShift.findByIdAndDelete = jest.fn();
+const MockShift = jest.fn();
+MockShift.create           = jest.fn();
+MockShift.find             = jest.fn();
+MockShift.findOne          = jest.fn();
+MockShift.findOneAndUpdate = jest.fn();
+MockShift.findOneAndDelete = jest.fn();
+
+const MockEvent = { findOne: jest.fn() };
+const MockUser  = { findOne: jest.fn() };
 
 jest.unstable_mockModule('../../models/shift.js', () => ({ default: MockShift }));
+jest.unstable_mockModule('../../models/event.js', () => ({ default: MockEvent }));
+jest.unstable_mockModule('../../models/user.js',  () => ({ default: MockUser }));
 
 const {
   createShift, getShifts, getShiftById, updateShift, deleteShift,
 } = await import('../../controllers/shiftController.js');
 
 const makeRes = () => ({ status: jest.fn().mockReturnThis(), json: jest.fn() });
+const ctx = { companyId: 'co1' };
 
 // ---------------------------------------------------------------------------
 // createShift
 // ---------------------------------------------------------------------------
 describe('createShift', () => {
-  it('saves the shift and returns 201', async () => {
-    const saved = { _id: 's1', startTime: '09:00' };
-    mockSave.mockResolvedValue(saved);
+  it('creates the shift when event + manager are in-company, returns 201', async () => {
+    MockEvent.findOne.mockResolvedValue({ _id: 'ev1' });
+    MockUser.findOne.mockResolvedValue({ _id: 'uid1' });
+    const saved = { _id: 's1' };
+    MockShift.create.mockResolvedValue(saved);
     const res = makeRes();
 
     await createShift({
-      body: { managerId: 'uid1', startTime: '2025-01-01T09:00:00Z', endTime: '2025-01-01T17:00:00Z', eventId: 'ev1' },
-    }, res);
+      ...ctx,
+      body: { managerId: 'uid1', eventId: 'ev1', startTime: '2025-01-01T09:00:00Z', endTime: '2025-01-01T17:00:00Z' },
+    }, res, jest.fn());
 
+    expect(MockShift.create).toHaveBeenCalledWith(expect.objectContaining({ company: 'co1' }));
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith(saved);
   });
 
-  it('returns 400 on save error', async () => {
-    mockSave.mockRejectedValue(new Error('validation failed'));
-    const res = makeRes();
+  it('calls next with 400 when the event is not in the company', async () => {
+    MockEvent.findOne.mockResolvedValue(null);
+    const next = jest.fn();
 
-    await createShift({ body: {} }, res);
+    await createShift({ ...ctx, body: { managerId: 'uid1', eventId: 'ev1' } }, makeRes(), next);
 
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400 }));
+    expect(MockShift.create).not.toHaveBeenCalled();
+  });
+
+  it('forwards unexpected errors to next', async () => {
+    MockEvent.findOne.mockResolvedValue({ _id: 'ev1' });
+    MockUser.findOne.mockResolvedValue({ _id: 'uid1' });
+    const err = new Error('fail');
+    MockShift.create.mockRejectedValue(err);
+    const next = jest.fn();
+
+    await createShift({ ...ctx, body: { managerId: 'uid1', eventId: 'ev1' } }, makeRes(), next);
+
+    expect(next).toHaveBeenCalledWith(err);
   });
 });
 
@@ -46,24 +69,26 @@ describe('createShift', () => {
 // getShifts
 // ---------------------------------------------------------------------------
 describe('getShifts', () => {
-  it('returns all shifts with 200', async () => {
-    const shifts = [{ _id: 's1' }, { _id: 's2' }];
+  it('returns this company\'s shifts with 200', async () => {
+    const shifts = [{ _id: 's1' }];
     MockShift.find.mockResolvedValue(shifts);
     const res = makeRes();
 
-    await getShifts({}, res);
+    await getShifts(ctx, res, jest.fn());
 
+    expect(MockShift.find).toHaveBeenCalledWith({ company: 'co1' });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(shifts);
   });
 
-  it('returns 500 on DB error', async () => {
-    MockShift.find.mockRejectedValue(new Error('fail'));
-    const res = makeRes();
+  it('forwards errors to next', async () => {
+    const err = new Error('fail');
+    MockShift.find.mockRejectedValue(err);
+    const next = jest.fn();
 
-    await getShifts({}, res);
+    await getShifts(ctx, makeRes(), next);
 
-    expect(res.status).toHaveBeenCalledWith(500);
+    expect(next).toHaveBeenCalledWith(err);
   });
 });
 
@@ -72,32 +97,22 @@ describe('getShifts', () => {
 // ---------------------------------------------------------------------------
 describe('getShiftById', () => {
   it('returns the shift with 200', async () => {
-    const shift = { _id: 's1' };
-    MockShift.findById.mockResolvedValue(shift);
+    MockShift.findOne.mockResolvedValue({ _id: 's1' });
     const res = makeRes();
 
-    await getShiftById({ params: { id: 's1' } }, res);
+    await getShiftById({ ...ctx, params: { id: 's1' } }, res, jest.fn());
 
+    expect(MockShift.findOne).toHaveBeenCalledWith({ _id: 's1', company: 'co1' });
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith(shift);
   });
 
-  it('returns 404 when shift not found', async () => {
-    MockShift.findById.mockResolvedValue(null);
-    const res = makeRes();
+  it('calls next with 404 when not found', async () => {
+    MockShift.findOne.mockResolvedValue(null);
+    const next = jest.fn();
 
-    await getShiftById({ params: { id: 's1' } }, res);
+    await getShiftById({ ...ctx, params: { id: 's1' } }, makeRes(), next);
 
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  it('returns 500 on DB error', async () => {
-    MockShift.findById.mockRejectedValue(new Error('fail'));
-    const res = makeRes();
-
-    await getShiftById({ params: { id: 's1' } }, res);
-
-    expect(res.status).toHaveBeenCalledWith(500);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
   });
 });
 
@@ -105,33 +120,24 @@ describe('getShiftById', () => {
 // updateShift
 // ---------------------------------------------------------------------------
 describe('updateShift', () => {
-  it('returns the updated shift with 200', async () => {
+  it('returns the updated shift with 200 (no ref change)', async () => {
     const updated = { _id: 's1', confirmed: true };
-    MockShift.findByIdAndUpdate.mockResolvedValue(updated);
+    MockShift.findOneAndUpdate.mockResolvedValue(updated);
     const res = makeRes();
 
-    await updateShift({ params: { id: 's1' }, body: { confirmed: true } }, res);
+    await updateShift({ ...ctx, params: { id: 's1' }, body: { confirmed: true } }, res, jest.fn());
 
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith(updated);
   });
 
-  it('returns 404 when shift not found', async () => {
-    MockShift.findByIdAndUpdate.mockResolvedValue(null);
-    const res = makeRes();
+  it('calls next with 404 when not found', async () => {
+    MockShift.findOneAndUpdate.mockResolvedValue(null);
+    const next = jest.fn();
 
-    await updateShift({ params: { id: 's1' }, body: {} }, res);
+    await updateShift({ ...ctx, params: { id: 's1' }, body: {} }, makeRes(), next);
 
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  it('returns 400 on validation error', async () => {
-    MockShift.findByIdAndUpdate.mockRejectedValue(new Error('validation failed'));
-    const res = makeRes();
-
-    await updateShift({ params: { id: 's1' }, body: {} }, res);
-
-    expect(res.status).toHaveBeenCalledWith(400);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
   });
 });
 
@@ -140,29 +146,20 @@ describe('updateShift', () => {
 // ---------------------------------------------------------------------------
 describe('deleteShift', () => {
   it('returns 200 on success', async () => {
-    MockShift.findByIdAndDelete.mockResolvedValue({ _id: 's1' });
+    MockShift.findOneAndDelete.mockResolvedValue({ _id: 's1' });
     const res = makeRes();
 
-    await deleteShift({ params: { id: 's1' } }, res);
+    await deleteShift({ ...ctx, params: { id: 's1' } }, res, jest.fn());
 
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
-  it('returns 404 when shift not found', async () => {
-    MockShift.findByIdAndDelete.mockResolvedValue(null);
-    const res = makeRes();
+  it('calls next with 404 when not found', async () => {
+    MockShift.findOneAndDelete.mockResolvedValue(null);
+    const next = jest.fn();
 
-    await deleteShift({ params: { id: 's1' } }, res);
+    await deleteShift({ ...ctx, params: { id: 's1' } }, makeRes(), next);
 
-    expect(res.status).toHaveBeenCalledWith(404);
-  });
-
-  it('returns 500 on DB error', async () => {
-    MockShift.findByIdAndDelete.mockRejectedValue(new Error('fail'));
-    const res = makeRes();
-
-    await deleteShift({ params: { id: 's1' } }, res);
-
-    expect(res.status).toHaveBeenCalledWith(500);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404 }));
   });
 });

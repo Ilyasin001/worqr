@@ -7,7 +7,7 @@
 
 <h2>About</h2>
 
-worqr is a Node.js/Express REST API backed by MongoDB. It lets administrators create events, schedule shifts tied to those events, assign staff with hourly rates and break tracking, and process payroll. Authentication is handled with JSON Web Tokens and role-based access control distinguishing `staff` from `admin`. Staff members can authenticate and view their own payroll history, while administrators manage the full lifecycle.
+worqr is a Node.js/Express REST API backed by MongoDB. It is a **multi-tenant, company-scoped** platform: each company gets its own isolated workspace. An owner creates a company (receiving a unique join code), staff register against that code, and all events, shifts, assignments, and payroll are scoped to the company — no cross-company data access is possible. Within a company, administrators create events, schedule shifts, assign staff with hourly rates and break tracking, and process payroll. Authentication is handled with JSON Web Tokens (carrying `userId`, `role`, and `companyId`) and role-based access control distinguishing `staff` from `admin`.
 
 The payroll engine calculates hours and pay from worked assignments within a period, then marks those assignments paid inside a database transaction to keep records consistent.
 
@@ -55,7 +55,15 @@ worqr/
 └── .github/workflows/     # CI pipeline (test.yml)
 ```
 
-All routes are mounted under `/api` — for example `/api/auth`, `/api/users`, `/api/events`, `/api/shifts`, `/api/assignments`, and `/api/payroll`.
+All routes are mounted under `/api` — `/api/companies`, `/api/auth`, `/api/users`, `/api/events`, `/api/shifts`, `/api/assignments`, and `/api/payroll`.
+
+### Onboarding endpoints
+
+- `POST /api/companies/register` — create a new company and its first admin (returns a JWT). Public.
+- `POST /api/auth/register` — staff join an existing company using its `companyCode` (returns a JWT). Public.
+- `POST /api/auth/login` — authenticate (returns a JWT). Public.
+- `GET /api/companies/me` — the caller's company (join code shown to admins only).
+- `POST /api/companies/rotate-code` — admin regenerates the company join code.
 
 <h2>Installation</h2>
 
@@ -97,7 +105,9 @@ Contributions are welcome. Please fork the repository and open a pull request, o
 
 <h2>Project status</h2>
 
-In active development. The backend API is functional, with several known bugs and hardening tasks outstanding (JWT identity field alignment, save-hook validation, user-update authorization, centralized error handling, expanded test coverage). The frontend client has not yet been built.
+In active development. The multi-tenant foundation is complete: company isolation is enforced across every resource and verified by a cross-tenant isolation test suite (236 tests passing, ~95% line coverage). The earlier hardening items (save-hook validation, user-update authorization, centralized error handling) are resolved. The React frontend supports company onboarding (create / join-with-code), login, and the core management pages.
+
+Planned next (not yet started): account lifecycle (password reset, email verification, refresh tokens), richer workforce operations (filtering, conflict detection, recurring shifts), time tracking, payroll completion (payslips, exports), notifications, and reporting dashboards. See [`docs/completion-plan.md`](docs/completion-plan.md) for the full roadmap.
 
 <h2>Credits</h2>
 

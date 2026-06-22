@@ -1,24 +1,49 @@
-import { useState } from 'react'
-import { ASSIGNMENTS, SHIFTS, STAFF, getShift, getStaff, getEvent, fmtDateTime } from '../data/mockData.js'
+import { useState, useEffect } from 'react'
+import { fmtDateTime } from '../data/mockData.js'
+import { getAssignments, createAssignment, updateAssignment, deleteAssignment } from '../api/assignments.js'
+import { getShifts } from '../api/shifts.js'
+import { getStaff } from '../api/staff.js'
+import { getEvents } from '../api/events.js'
 
 const EMPTY = { shiftId: '', staffId: '', hourlyRate: 12.00, breakDuration: 30 }
 
 export default function Assignments({ user }) {
-  const [assignments, setAssignments] = useState(ASSIGNMENTS)
-  const [search, setSearch] = useState('')
-  const [modal, setModal]   = useState(null)
-  const [form, setForm]     = useState(EMPTY)
+  const [assignments, setAssignments] = useState([])
+  const [shifts, setShifts]           = useState([])
+  const [staff, setStaff]             = useState([])
+  const [events, setEvents]           = useState([])
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState(null)
+  const [search, setSearch]           = useState('')
+  const [modal, setModal]             = useState(null)
+  const [form, setForm]               = useState(EMPTY)
 
   const isAdmin = user.role === 'admin'
 
+  useEffect(() => {
+    Promise.all([
+      getAssignments().catch(() => []),
+      getShifts().catch(() => []),
+      getStaff().catch(() => []),
+      getEvents().catch(() => []),
+    ])
+      .then(([a, sh, st, ev]) => {
+        setAssignments(a)
+        setShifts(sh)
+        setStaff(st)
+        setEvents(ev)
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
   const visible = assignments.filter(a => {
     if (!search) return true
-    const shift = getShift(a.shiftId)
-    const ev = shift ? getEvent(shift.eventId) : null
-    const staff = getStaff(a.staffId)
+    const shift = shifts.find(s => s._id === a.shiftId)
+    const ev    = shift ? events.find(e => e._id === shift.eventId) : null
+    const member = staff.find(s => s._id === a.staffId)
     return (
       ev?.title.toLowerCase().includes(search.toLowerCase()) ||
-      staff?.name.toLowerCase().includes(search.toLowerCase())
+      member?.name.toLowerCase().includes(search.toLowerCase())
     )
   })
 
@@ -26,17 +51,30 @@ export default function Assignments({ user }) {
   const openEdit   = (a) => { setForm({ ...a }); setModal(a) }
   const closeModal = () => { setModal(null); setForm(EMPTY) }
 
-  const save = () => {
+  const save = async () => {
     if (!form.shiftId || !form.staffId) return
-    if (modal === 'create') {
-      setAssignments(prev => [...prev, { ...form, _id: `a${Date.now()}`, isPaid: false, actualStartTime: null, actualEndTime: null }])
-    } else {
-      setAssignments(prev => prev.map(a => a._id === modal._id ? { ...a, ...form } : a))
+    try {
+      if (modal === 'create') {
+        const created = await createAssignment({ ...form, isPaid: false, actualStartTime: null, actualEndTime: null })
+        setAssignments(prev => [...prev, created])
+      } else {
+        const updated = await updateAssignment(modal._id, form)
+        setAssignments(prev => prev.map(a => a._id === modal._id ? updated : a))
+      }
+      closeModal()
+    } catch (e) {
+      setError(e.message)
     }
-    closeModal()
   }
 
-  const del = (id) => setAssignments(prev => prev.filter(a => a._id !== id))
+  const del = async (id) => {
+    try {
+      await deleteAssignment(id)
+      setAssignments(prev => prev.filter(a => a._id !== id))
+    } catch (e) {
+      setError(e.message)
+    }
+  }
 
   const calcHours = (a) => {
     if (!a.actualStartTime || !a.actualEndTime) return null
@@ -54,6 +92,12 @@ export default function Assignments({ user }) {
         {isAdmin && <button className="btn btn-primary" onClick={openCreate}>＋ Assign Staff</button>}
       </div>
 
+      {error && (
+        <div style={{ background: '#FEF2F2', color: '#991B1B', borderRadius: 6, padding: '8px 12px', fontSize: 13, marginBottom: 16 }}>
+          {error}
+        </div>
+      )}
+
       <div className="card">
         <div className="card-header">
           <div className="search-box" style={{ margin: 0 }}>
@@ -64,7 +108,9 @@ export default function Assignments({ user }) {
         </div>
 
         <div className="table-wrap">
-          {visible.length === 0 ? (
+          {loading ? (
+            <div className="empty-state"><p>Loading assignments…</p></div>
+          ) : visible.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">📋</div>
               <h3>No assignments found</h3>
@@ -85,18 +131,18 @@ export default function Assignments({ user }) {
               </thead>
               <tbody>
                 {visible.map(a => {
-                  const shift  = getShift(a.shiftId)
-                  const ev     = shift ? getEvent(shift.eventId) : null
-                  const staff  = getStaff(a.staffId)
+                  const shift  = shifts.find(s => s._id === a.shiftId)
+                  const ev     = shift ? events.find(e => e._id === shift.eventId) : null
+                  const member = staff.find(s => s._id === a.staffId)
                   const hours  = calcHours(a)
                   return (
                     <tr key={a._id}>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div className={`avatar avatar-sm avatar-${staff?.color || 'blue'}`}>
-                            {staff ? staff.name.split(' ').map(n=>n[0]).join('') : '?'}
+                          <div className={`avatar avatar-sm avatar-${member?.color || 'blue'}`}>
+                            {member ? member.name.split(' ').map(n => n[0]).join('') : '?'}
                           </div>
-                          <span style={{ fontWeight: 500 }}>{staff?.name || '—'}</span>
+                          <span style={{ fontWeight: 500 }}>{member?.name || '—'}</span>
                         </div>
                       </td>
                       <td>{ev?.title || '—'}</td>
@@ -150,20 +196,24 @@ export default function Assignments({ user }) {
                 <label className="form-label">Shift *</label>
                 <select className="form-select" value={form.shiftId} onChange={e => setForm(f => ({...f, shiftId: e.target.value}))}>
                   <option value="">Select shift…</option>
-                  {SHIFTS.map(sh => {
-                    const ev = getEvent(sh.eventId)
-                    return <option key={sh._id} value={sh._id}>{ev?.title} – {new Date(sh.startTime).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</option>
+                  {shifts.map(sh => {
+                    const ev = events.find(e => e._id === sh.eventId)
+                    return (
+                      <option key={sh._id} value={sh._id}>
+                        {ev?.title} – {new Date(sh.startTime).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
+                      </option>
+                    )
                   })}
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Staff Member *</label>
                 <select className="form-select" value={form.staffId} onChange={e => {
-                  const s = getStaff(e.target.value)
+                  const s = staff.find(m => m._id === e.target.value)
                   setForm(f => ({...f, staffId: e.target.value, hourlyRate: s?.hourlyRate || 12}))
                 }}>
                   <option value="">Select staff…</option>
-                  {STAFF.filter(s => s.role === 'staff').map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
+                  {staff.filter(s => s.role === 'staff').map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
                 </select>
               </div>
               <div className="form-row">

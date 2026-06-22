@@ -19,13 +19,17 @@ export const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     req.user = await User.findById(decoded.id).select('-passwordHash');
-    
+
     if (!req.user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: 'User not found.' 
+        message: 'User not found.'
       });
     }
+
+    // Authoritative tenant for company-scoped authorization — taken from the
+    // DB record, never trusted from the token payload.
+    req.companyId = req.user.company;
 
     next();
   } catch (error) {
