@@ -1,120 +1,149 @@
-<div align="center"><img src="images/logo.png" width="80"></div>
 <h1 align="center">Worqr</h1>
-<p align="center"><strong>A REST API for event staffing and payroll management.</strong>
-<br>Create events, schedule shifts, assign staff, and run payroll through a controlled draft → approve → finalize workflow.</p>
-<br/>
-<div align="center"><img src="demo.gif"></img></div>
+<p align="center"><strong>A multi-tenant web app for event staffing and payroll management.</strong>
+<br>Companies onboard their team, schedule events and shifts, assign staff, and run payroll through a controlled draft → approve → finalize workflow.</p>
 
 <h2>About</h2>
 
-worqr is a Node.js/Express REST API backed by MongoDB. It is a **multi-tenant, company-scoped** platform: each company gets its own isolated workspace. An owner creates a company (receiving a unique join code), staff register against that code, and all events, shifts, assignments, and payroll are scoped to the company — no cross-company data access is possible. Within a company, administrators create events, schedule shifts, assign staff with hourly rates and break tracking, and process payroll. Authentication is handled with JSON Web Tokens (carrying `userId`, `role`, and `companyId`) and role-based access control distinguishing `staff` from `admin`.
+Worqr is a full-stack application: a **Node.js/Express REST API** backed by MongoDB, plus a **React (Vite) frontend** that consumes it.
 
-The payroll engine calculates hours and pay from worked assignments within a period, then marks those assignments paid inside a database transaction to keep records consistent.
+It is **multi-tenant and company-scoped** — every company gets its own isolated workspace. An owner registers a company and receives a unique join code; staff register against that code; and all data (users, events, shifts, assignments, payroll) is scoped to the company. No cross-company access is possible — this isolation is enforced on every query and verified by a dedicated test suite.
 
-<h2>Goal and requirements</h2>
+Authentication uses JSON Web Tokens carrying `{ id, role, companyId }`, with role-based access control distinguishing `staff` from `admin`. The payroll engine computes hours and pay from worked assignments within a period, then marks them paid inside a database transaction so multi-document updates stay consistent.
 
-The aim of this project is to build a secure, well-structured backend for managing event staff and their pay. The implementation is expected to include:
+<h2>Tech stack</h2>
 
-- JWT authentication with hashed passwords and role-based authorization
-- CRUD operations for users, events, shifts, and assignments
-- A multi-step payroll workflow (draft, approve, finalize) with transactional safety
-- Payroll reporting: per-staff history, admin batch listings, and yearly summaries
-- Request validation on incoming data
-- A clean, layered architecture (routes → controllers → services → models)
+| Area | Technologies |
+|---|---|
+| Backend | Node.js, Express (ESM), Mongoose / MongoDB |
+| Auth & security | JSON Web Tokens, bcrypt, Helmet, express-rate-limit, CORS |
+| Validation | express-validator |
+| Frontend | React 18, Vite, React Router |
+| Testing | Jest, Supertest, mongodb-memory-server (replica set) |
+| CI | GitHub Actions |
 
-A frontend client is planned but not part of the initial backend scope.
+<h2>Features</h2>
 
-<h2>Key learnings</h2>
+- **Company onboarding** — create a company (atomic company + first admin), or join an existing one with a company code; admins can view and rotate the join code.
+- **Multi-tenant isolation** — every resource is scoped to the caller's company; cross-entity creates verify referenced documents belong to the same company.
+- **Authentication & roles** — JWT auth with hashed passwords; `protect`, `adminOnly`, and `restrictTo(...)` middleware; the company is read from the database record, never trusted from the token.
+- **Workforce management** — CRUD for users, events, shifts, and assignments (hourly rate + break tracking).
+- **Payroll workflow** — generate a draft from worked assignments, approve it, then finalize inside a transaction that marks assignments paid; per-staff history, admin batch listings, and yearly summaries.
+- **Validation & error handling** — request validation on every write; a centralized error handler returns consistent `{ success, message }` responses and maps Mongoose validation, cast, and duplicate-key errors to the right status codes.
+- **React client** — onboarding (create / join), login, and dashboard, events, shifts, staff, assignments, and payroll pages wired to the live API.
 
-- Structuring an Express API into clear, separated layers
-- Implementing JWT authentication and role-based middleware
-- Modelling related data in MongoDB with Mongoose references
-- Using database transactions to keep multi-document updates atomic
-- Validating and sanitising request input with `express-validator`
-- Setting up continuous integration with GitHub Actions and Jest
+<h2>Architecture</h2>
 
-<h2>Project structure</h2>
+The backend follows a layered design: **routes → controllers → services → models**, with `express-validator` chains and auth middleware wired in front of each route. The frontend is a plain React + Vite SPA with a small hand-rolled fetch client and per-resource API wrappers; `App.jsx` owns auth state and gates routes behind login.
 
 ```
 worqr/
 ├── server/
 │   ├── src/
-│   │   ├── config/        # Database connection (db.js)
-│   │   ├── controllers/   # Request handlers for each resource
-│   │   ├── middleware/    # Auth (protect) and role gating (restrictTo, adminOnly)
-│   │   ├── models/        # Mongoose schemas: user, event, shift, assignment, payrollBatch
-│   │   ├── routes/        # Route definitions, one file per resource
-│   │   ├── services/      # Business logic (payrollService.js)
-│   │   ├── validators/    # express-validator rule sets (auth, event)
-│   │   ├── utils/         # Shared helpers (appError.js)
-│   │   ├── __tests__/     # Jest test suites
-│   │   └── server.js      # Application entry point
+│   │   ├── config/        # db.js — MongoDB connection
+│   │   ├── controllers/   # auth, company, user, event, shift, assignment, payroll
+│   │   ├── middleware/    # authMiddleware (protect / adminOnly / restrictTo), errorMiddleware
+│   │   ├── models/        # company, user, event, shift, assignment, payrollBatch
+│   │   ├── routes/        # one router per resource
+│   │   ├── services/      # payrollService.js (hours/pay calculation)
+│   │   ├── validators/    # express-validator rule sets per resource
+│   │   ├── utils/         # appError, companyCode, token
+│   │   ├── __tests__/      # unit, route, and integration (in-memory Mongo) suites
+│   │   └── server.js       # application entry point
 │   ├── jest.config.mjs
 │   └── package.json
-├── frontend/              # Placeholder for the future client app
-└── .github/workflows/     # CI pipeline (test.yml)
+├── frontend/
+│   └── src/
+│       ├── api/            # fetch client + per-resource wrappers
+│       ├── components/     # Layout
+│       ├── pages/          # Login, Register, Dashboard, Events, Shifts, Staff, Assignments, Payroll
+│       ├── data/           # display helpers
+│       ├── App.jsx
+│       └── main.jsx
+├── docs/                   # project audit, completion plan, multi-tenancy plan
+└── .github/workflows/      # CI pipeline (test.yml)
 ```
 
-All routes are mounted under `/api` — `/api/companies`, `/api/auth`, `/api/users`, `/api/events`, `/api/shifts`, `/api/assignments`, and `/api/payroll`.
+<h2>API</h2>
 
-### Onboarding endpoints
+All routes are mounted under `/api`. Send the JWT returned by the auth endpoints as `Authorization: Bearer <token>` on protected routes.
 
-- `POST /api/companies/register` — create a new company and its first admin (returns a JWT). Public.
-- `POST /api/auth/register` — staff join an existing company using its `companyCode` (returns a JWT). Public.
-- `POST /api/auth/login` — authenticate (returns a JWT). Public.
+**Onboarding & auth (public)**
+- `POST /api/companies/register` — create a company + its first admin; returns a JWT.
+- `POST /api/auth/register` — join an existing company using its `companyCode`; returns a JWT.
+- `POST /api/auth/login` — authenticate; returns a JWT.
+
+**Company**
 - `GET /api/companies/me` — the caller's company (join code shown to admins only).
-- `POST /api/companies/rotate-code` — admin regenerates the company join code.
+- `POST /api/companies/rotate-code` — admin regenerates the join code.
 
-<h2>Installation</h2>
+**Resources** (all company-scoped)
+- `/api/users` — admin CRUD; staff may read their own profile.
+- `/api/events`, `/api/shifts`, `/api/assignments` — read for any member; create/update/delete for admins.
+- `/api/payroll` — `my-history` (staff); `draft`, `:id/approve`, `:id/finalize`, `batches`, `summary` (admin).
 
-1. Clone this repository and enter the server directory
+<h2>Getting started</h2>
 
-   ```sh
-   git clone https://github.com/Ilyasin001/worqr.git
-   cd worqr/server
-   ```
+**Prerequisites:** Node.js 18+ and a MongoDB instance (local or hosted).
 
-2. Install the dependencies
+**1. Backend**
 
-   ```sh
-   npm install
-   ```
+```sh
+git clone https://github.com/Ilyasin001/worqr.git
+cd worqr/server
+npm install
+```
 
-3. Create a `.env` file in the `server/` directory
+Create a `.env` file in `server/`:
 
-   ```env
-   PORT=3001
-   MONGO_URI=mongodb://localhost:27017/worqr
-   JWT_SECRET=replace-with-a-long-random-secret
-   JWT_EXPIRATION=1d
-   ```
+```env
+PORT=3001
+MONGO_URI=mongodb://localhost:27017/worqr
+JWT_SECRET=replace-with-a-long-random-secret
+JWT_EXPIRATION=1d
+```
 
-4. Run the server
+Run it:
 
-   ```sh
-   npm run dev    # development with auto-reload
-   npm start      # production
-   npm test       # run the test suite
-   ```
+```sh
+npm run dev    # development with auto-reload (nodemon)
+npm start      # production
+npm test       # run the Jest suite
+```
 
-The server starts on `http://localhost:3001`. Send the token returned by `/api/auth/login` as a Bearer token (`Authorization: Bearer <token>`) on protected routes.
+The API starts on `http://localhost:3001`.
 
-<h2>Contributing</h2>
+**2. Frontend**
 
-Contributions are welcome. Please fork the repository and open a pull request, or open an issue with the `enhancement` tag to discuss a change first. See the <a href="https://github.com/Ilyasin001/worqr/pulls" target="_blank">pull requests</a> page.
+```sh
+cd worqr/frontend
+npm install
+npm run dev    # Vite dev server on http://localhost:5173
+```
+
+The dev server runs on port 5173, which the backend's CORS configuration allows. Open the app, create a company to get started, then share the join code with staff. (`npm run build` produces a production bundle; `npm run preview` serves it.)
+
+<h2>Testing</h2>
+
+The backend has unit (controllers, service, middleware), route, and integration test suites. Integration tests run against an in-memory MongoDB replica set (`mongodb-memory-server`) so real Mongoose transactions are exercised, and include a cross-tenant isolation suite that verifies one company can never read or modify another's data.
+
+```sh
+cd server
+npm test
+```
+
+CI (`.github/workflows/test.yml`) runs `npm ci && npm test` in `server/` on every push and pull request to `main`.
 
 <h2>Project status</h2>
 
-In active development. The multi-tenant foundation is complete: company isolation is enforced across every resource and verified by a cross-tenant isolation test suite (236 tests passing, ~95% line coverage). The earlier hardening items (save-hook validation, user-update authorization, centralized error handling) are resolved. The React frontend supports company onboarding (create / join-with-code), login, and the core management pages.
+In active development. The multi-tenant foundation is complete and verified (full backend test suite passing with high coverage), and the React client supports onboarding, login, and the core management pages.
 
 Planned next (not yet started): account lifecycle (password reset, email verification, refresh tokens), richer workforce operations (filtering, conflict detection, recurring shifts), time tracking, payroll completion (payslips, exports), notifications, and reporting dashboards. See [`docs/completion-plan.md`](docs/completion-plan.md) for the full roadmap.
 
 <h2>Credits</h2>
 
 - Author: <a href="https://github.com/Ilyasin001" target="_blank">Ilyasin001</a>
-- README structure adapted from <a href="https://github.com/r4dixx" target="_blank">Amaël Sikel</a>'s template
-- Built with Express, Mongoose, and Jest
+- Built with Express, Mongoose, React, Vite, and Jest
 
-<h2>Copyright</h2>
+<h2>License</h2>
 
-This project is licensed under the terms of the ISC license. See <a href="LICENSE">license</a> for more information.
+Licensed under the terms of the ISC license (per `server/package.json`).
