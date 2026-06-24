@@ -4,13 +4,13 @@ import { initials } from '../data/mockData.js'
 import { resendVerification } from '../api/account.js'
 
 const NAV = [
-  { to: '/',            icon: '⊞', label: 'Dashboard'   },
-  { to: '/events',      icon: '📅', label: 'Events'      },
-  { to: '/shifts',      icon: '🕐', label: 'Shifts'      },
-  { to: '/staff',       icon: '👥', label: 'Staff'       },
-  { to: '/assignments', icon: '📋', label: 'Assignments' },
-  { to: '/payroll',     icon: '💷', label: 'Payroll'     },
-  { to: '/profile',     icon: '👤', label: 'My Profile'  },
+  { to: '/',            icon: 'dashboard',  label: 'Dashboard'   },
+  { to: '/events',      icon: 'event',      label: 'Events'      },
+  { to: '/shifts',      icon: 'schedule',   label: 'Shifts'      },
+  { to: '/staff',       icon: 'group',      label: 'Staff'       },
+  { to: '/assignments', icon: 'assignment', label: 'Assignments' },
+  { to: '/payroll',     icon: 'payments',   label: 'Payroll'     },
+  { to: '/profile',     icon: 'person',     label: 'My Profile'  },
 ]
 
 const PAGE_TITLES = {
@@ -59,7 +59,7 @@ export default function Layout({ user, onLogout, children }) {
               end={to === '/'}
               className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
             >
-              <span className="nav-icon">{icon}</span>
+              <span className="nav-icon material-symbols-outlined">{icon}</span>
               {label}
             </NavLink>
           ))}
@@ -72,7 +72,9 @@ export default function Layout({ user, onLogout, children }) {
               <div className="user-name">{user.name}</div>
               <div className="user-role">{user.role}</div>
             </div>
-            <button className="logout-btn" onClick={onLogout} title="Log out">⏻</button>
+            <button className="logout-btn" onClick={onLogout} title="Log out">
+              <span className="material-symbols-outlined">logout</span>
+            </button>
           </div>
         </div>
       </aside>
@@ -97,7 +99,7 @@ export default function Layout({ user, onLogout, children }) {
             background: '#FEF3C7', color: '#92400E',
             padding: '10px 24px', fontSize: 13, borderBottom: '1px solid #FDE68A',
           }}>
-            <span>✉️</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>mark_email_unread</span>
             <span style={{ flex: 1 }}>
               {verifyMsg || 'Please verify your email address to secure your account.'}
             </span>

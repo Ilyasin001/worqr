@@ -2,10 +2,7 @@ import Assignment from "../models/assignment.js";
 import Shift from "../models/shift.js";
 import User from "../models/user.js";
 import { AppError } from "../utils/appError.js";
-
-// Two time ranges overlap when each starts before the other ends.
-const overlaps = (a, b) =>
-    a.startTime < b.endTime && b.startTime < a.endTime;
+import { assertNoStaffConflict } from "../services/assignmentConflicts.js";
 
 // Verifies the shift + staff member both belong to the caller's company and
 // returns the loaded shift (needed for conflict detection).
@@ -19,23 +16,6 @@ const assertAssignmentRefsInCompany = async (companyId, shiftId, staffId) => {
         throw new AppError("Staff member not found in your company", 400);
     }
     return shift;
-};
-
-// Throws 409 if the staff member already has an active assignment on a shift
-// whose time overlaps `targetShift` (double-booking). `ignoreAssignmentId`
-// skips the assignment being updated.
-const assertNoStaffConflict = async (companyId, staffId, targetShift, ignoreAssignmentId = null) => {
-    const active = await Assignment.find({
-        company: companyId,
-        staffId,
-        status: { $in: ["assigned", "confirmed"] },
-        ...(ignoreAssignmentId ? { _id: { $ne: ignoreAssignmentId } } : {}),
-    }).populate("shiftId");
-
-    const clash = active.some((a) => a.shiftId && overlaps(a.shiftId, targetShift));
-    if (clash) {
-        throw new AppError("Staff member already has an overlapping shift in this period", 409);
-    }
 };
 
 export const createAssignment = async (req, res, next) => {
@@ -83,11 +63,13 @@ export const updateAssignment = async (req, res, next) => {
             if (!existing) {
                 throw new AppError("Assignment not found", 404);
             }
-            await assertAssignmentRefsInCompany(
+            const shift = await assertAssignmentRefsInCompany(
                 req.companyId,
                 shiftId ?? existing.shiftId,
                 staffId ?? existing.staffId
             );
+            // Reassigning staff (or moving to a new shift) must not double-book them.
+            await assertNoStaffConflict(req.companyId, staffId ?? existing.staffId, shift, existing._id);
         }
 
         // Never let the body relocate a record to another tenant.

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import { fmtDate, fmtTime } from '../data/mockData.js'
-import { getShifts, createShift, updateShift, deleteShift } from '../api/shifts.js'
+import { getShifts, getOpenShifts, claimShift, createShift, updateShift, deleteShift } from '../api/shifts.js'
 import { getEvents } from '../api/events.js'
 import { getStaff } from '../api/staff.js'
 
-const EMPTY = { eventId: '', managerId: '', startTime: '', endTime: '', confirmed: false }
+const EMPTY = { eventId: '', managerId: '', startTime: '', endTime: '', confirmed: false, repeatFreq: 'none', repeatCount: 4 }
 
 export default function Shifts({ user }) {
   const [shifts, setShifts]   = useState([])
@@ -26,13 +26,24 @@ export default function Shifts({ user }) {
       .then(([ev, st]) => { setEvents(ev); setStaff(st) })
   }, [])
 
-  // Shifts re-fetched from the backend whenever the filters change.
+  // Admins see/manage all shifts (filtered); staff see only open shifts to claim.
   useEffect(() => {
     const params = {}
     if (eventFilter) params.eventId = eventFilter
     if (confirmedFilter !== 'all') params.confirmed = confirmedFilter
-    getShifts(params).then(setShifts).catch(e => setError(e.message)).finally(() => setLoading(false))
-  }, [eventFilter, confirmedFilter])
+    const p = isAdmin ? getShifts(params) : getOpenShifts()
+    p.then(setShifts).catch(e => setError(e.message)).finally(() => setLoading(false))
+  }, [eventFilter, confirmedFilter, isAdmin])
+
+  const claim = async (id) => {
+    setError(null)
+    try {
+      await claimShift(id)
+      setShifts(prev => prev.filter(s => s._id !== id)) // claimed → no longer open
+    } catch (e) {
+      setError(e.message)
+    }
+  }
 
   const visible = shifts.filter(s => {
     const ev = events.find(e => e._id === s.eventId)
@@ -47,8 +58,16 @@ export default function Shifts({ user }) {
     if (!form.eventId || !form.managerId || !form.startTime || !form.endTime) return
     try {
       if (modal === 'create') {
-        const created = await createShift({ ...form, confirmed: false })
-        setShifts(prev => [...prev, created])
+        const payload = {
+          eventId: form.eventId, managerId: form.managerId,
+          startTime: form.startTime, endTime: form.endTime, confirmed: false,
+        }
+        if (form.repeatFreq && form.repeatFreq !== 'none') {
+          payload.repeat = { frequency: form.repeatFreq, count: Number(form.repeatCount) || 1 }
+        }
+        const created = await createShift(payload)
+        const arr = Array.isArray(created) ? created : [created]
+        setShifts(prev => [...prev, ...arr])
       } else {
         const updated = await updateShift(modal._id, form)
         setShifts(prev => prev.map(s => s._id === modal._id ? updated : s))
@@ -90,7 +109,7 @@ export default function Shifts({ user }) {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Shifts</h1>
-          <p>View and manage shifts assigned to events.</p>
+          <p>{isAdmin ? 'View and manage shifts assigned to events.' : 'Open shifts you can pick up.'}</p>
         </div>
         {isAdmin && <button className="btn btn-primary" onClick={openCreate}>＋ New Shift</button>}
       </div>
@@ -108,15 +127,19 @@ export default function Shifts({ user }) {
             <input placeholder="Search by event…" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select className="form-select" style={{ width: 'auto' }} value={eventFilter} onChange={e => setEventFilter(e.target.value)}>
-              <option value="">All events</option>
-              {events.map(ev => <option key={ev._id} value={ev._id}>{ev.title}</option>)}
-            </select>
-            <select className="form-select" style={{ width: 'auto' }} value={confirmedFilter} onChange={e => setConfirmedFilter(e.target.value)}>
-              <option value="all">All statuses</option>
-              <option value="true">Confirmed</option>
-              <option value="false">Pending</option>
-            </select>
+            {isAdmin && (
+              <>
+                <select className="form-select" style={{ width: 'auto' }} value={eventFilter} onChange={e => setEventFilter(e.target.value)}>
+                  <option value="">All events</option>
+                  {events.map(ev => <option key={ev._id} value={ev._id}>{ev.title}</option>)}
+                </select>
+                <select className="form-select" style={{ width: 'auto' }} value={confirmedFilter} onChange={e => setConfirmedFilter(e.target.value)}>
+                  <option value="all">All statuses</option>
+                  <option value="true">Confirmed</option>
+                  <option value="false">Pending</option>
+                </select>
+              </>
+            )}
             <span className="badge badge-blue">{visible.length} shifts</span>
           </div>
         </div>
@@ -135,7 +158,7 @@ export default function Shifts({ user }) {
                   <th>End</th>
                   <th>Duration</th>
                   <th>Status</th>
-                  {isAdmin && <th>Actions</th>}
+                  <th>{isAdmin ? 'Actions' : 'Claim'}</th>
                 </tr>
               </thead>
               <tbody>
@@ -155,8 +178,8 @@ export default function Shifts({ user }) {
                           {sh.confirmed ? 'Confirmed' : 'Pending'}
                         </span>
                       </td>
-                      {isAdmin && (
-                        <td>
+                      <td>
+                        {isAdmin ? (
                           <div style={{ display: 'flex', gap: 4 }}>
                             <button className="btn btn-ghost btn-sm" onClick={() => toggleConfirm(sh._id)}>
                               {sh.confirmed ? '⏸ Unconfirm' : '✓ Confirm'}
@@ -164,8 +187,10 @@ export default function Shifts({ user }) {
                             <button className="btn btn-ghost btn-sm" onClick={() => openEdit(sh)}>✏️</button>
                             <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(sh._id)}>🗑</button>
                           </div>
-                        </td>
-                      )}
+                        ) : (
+                          <button className="btn btn-primary btn-sm" onClick={() => claim(sh._id)}>＋ Claim</button>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}
@@ -207,6 +232,24 @@ export default function Shifts({ user }) {
                   <input className="form-input" type="datetime-local" value={form.endTime?.slice(0,16) || ''} onChange={e => setForm(f => ({...f, endTime: e.target.value + ':00Z'}))} />
                 </div>
               </div>
+              {modal === 'create' && (
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Repeat</label>
+                    <select className="form-select" value={form.repeatFreq} onChange={e => setForm(f => ({...f, repeatFreq: e.target.value}))}>
+                      <option value="none">Does not repeat</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                    </select>
+                  </div>
+                  {form.repeatFreq !== 'none' && (
+                    <div className="form-group">
+                      <label className="form-label">Occurrences</label>
+                      <input className="form-input" type="number" min="1" max="60" value={form.repeatCount} onChange={e => setForm(f => ({...f, repeatCount: e.target.value}))} />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={closeModal}>Cancel</button>

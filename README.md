@@ -28,7 +28,7 @@ Authentication uses JSON Web Tokens carrying `{ id, role, companyId }`, with rol
 - **Authentication & roles** — JWT auth with hashed passwords; `protect`, `adminOnly`, and `restrictTo(...)` middleware; the company is read from the database record, never trusted from the token.
 - **Account lifecycle** — self-service profile, change password, forgot/reset password (hashed, time-limited tokens), and soft email verification with a resend flow. Emails are sent over SMTP (any provider) via Nodemailer, with best-effort delivery and a console fallback when SMTP isn't configured.
 - **Session management** — short-lived access tokens paired with rotating refresh tokens (stored hashed, with a TTL); the client refreshes transparently on expiry, and logout revokes the refresh token server-side.
-- **Workforce management** — CRUD for users, events, shifts, and assignments (hourly rate + break tracking), plus event filtering/search, capacity tracking with a live filled count, event notes, shift filtering, assignment status (confirm/decline/cancel), and double-booking conflict detection.
+- **Workforce management** — CRUD for users, events, shifts, and assignments (hourly rate + break tracking), plus event filtering/search, capacity tracking with a live filled count, event notes, shift filtering, recurring shifts, staff self-service (open shifts + claim), assignment status (confirm/decline/cancel), and double-booking conflict detection on assignment and reassignment.
 - **Payroll workflow** — generate a draft from worked assignments, approve it, then finalize inside a transaction that marks assignments paid; per-staff history, admin batch listings, and yearly summaries.
 - **Validation & error handling** — request validation on every write; a centralized error handler returns consistent `{ success, message }` responses and maps Mongoose validation, cast, and duplicate-key errors to the right status codes.
 - **React client** — onboarding (create / join), login, and dashboard, events, shifts, staff, assignments, and payroll pages wired to the live API.
@@ -92,8 +92,8 @@ All routes are mounted under `/api`. Send the JWT returned by the auth endpoints
 **Resources** (all company-scoped)
 - `/api/users` — admin CRUD; staff may read their own profile.
 - `/api/events` — read/create/update/delete; `GET` supports `?status=`, `?q=` (title/description/address search), and `?from=`/`?to=` date-range filters, and returns a live `filledCount` per event (with optional `capacity`).
-- `/api/shifts` — `GET` supports `?eventId=`, `?confirmed=`, and `?from=`/`?to=` filters.
-- `/api/assignments` — admin create/update/delete; `PATCH /:id/status` lets staff confirm/decline their own assignment and admins set any status. Creating an assignment is rejected with 409 if it double-books a staff member onto an overlapping shift.
+- `/api/shifts` — `GET` supports `?eventId=`, `?confirmed=`, and `?from=`/`?to=` filters. Admins can create a **recurring** series (`repeat: { frequency: "daily"|"weekly", count }`). `GET /shifts/open` lists upcoming shifts a member can pick up, and `POST /shifts/:id/claim` lets a staff member self-assign (conflict-checked).
+- `/api/assignments` — admin create/update/delete; `PATCH /:id/status` lets staff confirm/decline their own assignment and admins set any status. Creating an assignment **or reassigning** one is rejected with 409 if it double-books a staff member onto an overlapping shift.
 - `/api/payroll` — `my-history` (staff); `draft`, `:id/approve`, `:id/finalize`, `batches`, `summary` (admin).
 
 <h2>Getting started</h2>
@@ -137,7 +137,9 @@ npm test       # run the Jest suite
 
 The API starts on `http://localhost:3001`.
 
-> **Using MongoDB Atlas?** Add your machine's IP to the cluster's *Network Access* allowlist, or connections are refused.
+> **Using MongoDB Atlas?** Add your machine's IP to the cluster's *Network Access* allowlist, or connections are refused. The server now retries the DB connection with backoff (rather than crashing) if Atlas is briefly unreachable, and the driver auto-reconnects after a dropped connection.
+
+A `GET /health` endpoint reports liveness and DB state (`200` when connected, `503` while the database is unreachable).
 
 ### Seeding demo data
 
@@ -177,9 +179,9 @@ CI (`.github/workflows/test.yml`) runs `npm ci && npm test` in `server/` on ever
 
 In active development. The multi-tenant foundation and the full authentication & account lifecycle — onboarding, profile, change/forgot/reset password, soft email verification (over SMTP), and session management (access + rotating refresh tokens, logout) — are complete and verified (full backend test suite passing with high coverage). The React client supports onboarding, login, the password/verification flows, a profile page, transparent token refresh, and the core management pages.
 
-The core workforce operations (event filtering/search/capacity/notes, shift filtering, assignment status + conflict detection) are also complete.
+Workforce operations are complete: event filtering/search/capacity/notes, shift filtering, recurring shifts, staff self-service (open shifts + claim), assignment status, and conflict detection on assignment and reassignment.
 
-Planned next (not yet started): staff self-service (claim open shifts, request assignments, swaps) and recurring shifts, time tracking, payroll completion (payslips, exports), notifications, and reporting dashboards. See [`docs/completion-plan.md`](docs/completion-plan.md) for the full roadmap.
+Planned next (not yet started): time tracking (clock in/out), payroll completion (payslips, exports), notifications, and reporting dashboards. See [`docs/completion-plan.md`](docs/completion-plan.md) for the full roadmap.
 
 <h2>Credits</h2>
 

@@ -22,6 +22,14 @@ export const createShiftValidator = [
   body('confirmed')
     .optional()
     .isBoolean().withMessage('Confirmed must be a boolean'),
+
+  body('repeat.frequency')
+    .optional()
+    .isIn(['daily', 'weekly']).withMessage('Recurrence frequency must be daily or weekly'),
+
+  body('repeat.count')
+    .optional()
+    .isInt({ min: 1, max: 60 }).withMessage('Recurrence count must be between 1 and 60'),
 ];
 
 export const updateShiftValidator = [

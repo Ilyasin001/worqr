@@ -7,10 +7,10 @@ import { getBatches } from '../api/payroll.js'
 
 const COLORS = ['indigo','blue','green','orange','pink','teal','red','purple']
 
-const StatCard = ({ icon, label, value, change, changeType, bg }) => (
+const StatCard = ({ icon, label, value, change, changeType, bg, fg }) => (
   <div className="stat-card">
-    <div className="stat-icon" style={{ background: bg }}>
-      <span style={{ fontSize: 20 }}>{icon}</span>
+    <div className="stat-icon" style={{ background: bg, color: fg }}>
+      <span className="material-symbols-outlined" style={{ fontSize: 22 }}>{icon}</span>
     </div>
     <div className="stat-content">
       <div className="stat-value">{value}</div>
@@ -73,10 +73,10 @@ export default function Dashboard({ user }) {
 
       {/* ── STATS ── */}
       <div className="stats-grid">
-        <StatCard icon="👥" label="Total Staff"      value={staff.length}       change="2 this month"    changeType="up"   bg="#EDE9FE" />
-        <StatCard icon="📅" label="Upcoming Events"  value={upcoming.length}    change="1 new this week" changeType="up"   bg="#DBEAFE" />
-        <StatCard icon="🕐" label="Active Shifts"    value={shifts.length}      change="from 4 last wk"  changeType="up"   bg="#D1FAE5" />
-        <StatCard icon="💷" label="Pending Payroll"  value={pendingPayroll}     change="2 awaiting approval" changeType="down" bg="#FEF3C7" />
+        <StatCard icon="group"    label="Total Staff"     value={staff.length}    change="2 this month"        changeType="up"   bg="#e1e0ff" fg="#2f2ebe" />
+        <StatCard icon="event"    label="Upcoming Events" value={upcoming.length} change="1 new this week"     changeType="up"   bg="#dce9ff" fg="#1d4ed8" />
+        <StatCard icon="schedule" label="Active Shifts"   value={shifts.length}   change="from 4 last wk"      changeType="up"   bg="#d7f1ec" fg="#00504a" />
+        <StatCard icon="payments" label="Pending Payroll" value={pendingPayroll}  change="2 awaiting approval" changeType="down" bg="#f7ecd3" fg="#6b4a00" />
       </div>
 
       {/* ── LOWER GRID ── */}
@@ -99,7 +99,10 @@ export default function Dashboard({ user }) {
                 />
                 <div className="event-info">
                   <div className="event-name">{ev.title}</div>
-                  <div className="event-meta">📍 {ev.address}</div>
+                  <div className="event-meta" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>location_on</span>
+                    {ev.address}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                   <div className="event-date">{fmtDate(ev.date)}</div>

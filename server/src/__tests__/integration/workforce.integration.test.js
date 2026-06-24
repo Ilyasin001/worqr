@@ -1,6 +1,6 @@
 // Phase 3 — workforce operations: event filtering/search/capacity, shift
 // filtering, assignment conflict detection and status transitions.
-import { startDb, clearDb, stopDb, buildApp, seedAdmin, seedStaff, seedEvent } from './helper.js';
+import { startDb, clearDb, stopDb, buildApp, seedAdmin, seedStaff, seedStaffUser, seedEvent } from './helper.js';
 import request from 'supertest';
 
 let app;
@@ -171,5 +171,103 @@ describe('assignments — status transitions', () => {
     await request(app).patch(`/api/assignments/${assignmentId}/status`).set(asAdmin()).send({ status: 'cancelled' });
     const res = await request(app).get(`/api/events/${event._id}`).set(asAdmin());
     expect(res.body.filledCount).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Recurring shifts
+// ---------------------------------------------------------------------------
+describe('shifts — recurring', () => {
+  it('generates a weekly series of the requested length', async () => {
+    const res = await request(app).post('/api/shifts').set(asAdmin()).send({
+      managerId: admin.user._id.toString(),
+      eventId: event._id.toString(),
+      startTime: '2026-04-01T09:00:00.000Z',
+      endTime: '2026-04-01T17:00:00.000Z',
+      repeat: { frequency: 'weekly', count: 3 },
+    });
+    expect(res.status).toBe(201);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body).toHaveLength(3);
+    // A week apart.
+    const starts = res.body.map(s => new Date(s.startTime).getTime()).sort((a, b) => a - b);
+    expect(starts[1] - starts[0]).toBe(7 * 24 * 3600 * 1000);
+  });
+
+  it('rejects an out-of-range recurrence count', async () => {
+    const res = await request(app).post('/api/shifts').set(asAdmin()).send({
+      managerId: admin.user._id.toString(),
+      eventId: event._id.toString(),
+      startTime: '2026-04-01T09:00:00.000Z',
+      endTime: '2026-04-01T17:00:00.000Z',
+      repeat: { frequency: 'weekly', count: 999 },
+    });
+    expect(res.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Open shifts + claim (staff self-service)
+// ---------------------------------------------------------------------------
+describe('shifts — open & claim', () => {
+  const createShift = (start, end) =>
+    request(app).post('/api/shifts').set(asAdmin()).send({
+      managerId: admin.user._id.toString(), eventId: event._id.toString(), startTime: start, endTime: end,
+    });
+
+  it('lists upcoming claimable shifts and removes them once claimed', async () => {
+    const shift = await createShift('2099-04-01T09:00:00.000Z', '2099-04-01T17:00:00.000Z');
+
+    const openBefore = await request(app).get('/api/shifts/open').set(asStaff());
+    expect(openBefore.status).toBe(200);
+    expect(openBefore.body.some(s => s._id === shift.body._id)).toBe(true);
+
+    const claim = await request(app).post(`/api/shifts/${shift.body._id}/claim`).set(asStaff());
+    expect(claim.status).toBe(201);
+    expect(claim.body.staffId).toBe(staff.user._id.toString());
+
+    const openAfter = await request(app).get('/api/shifts/open').set(asStaff());
+    expect(openAfter.body.some(s => s._id === shift.body._id)).toBe(false);
+
+    // The claim fills a slot on the event.
+    const ev = await request(app).get(`/api/events/${event._id}`).set(asStaff());
+    expect(ev.body.filledCount).toBe(1);
+  });
+
+  it('rejects claiming the same shift twice (409)', async () => {
+    const shift = await createShift('2099-05-01T09:00:00.000Z', '2099-05-01T17:00:00.000Z');
+    expect((await request(app).post(`/api/shifts/${shift.body._id}/claim`).set(asStaff())).status).toBe(201);
+    expect((await request(app).post(`/api/shifts/${shift.body._id}/claim`).set(asStaff())).status).toBe(409);
+  });
+
+  it('rejects claiming a shift that overlaps one already held (409)', async () => {
+    const s1 = await createShift('2099-06-01T09:00:00.000Z', '2099-06-01T17:00:00.000Z');
+    const s2 = await createShift('2099-06-01T12:00:00.000Z', '2099-06-01T20:00:00.000Z');
+    expect((await request(app).post(`/api/shifts/${s1.body._id}/claim`).set(asStaff())).status).toBe(201);
+    expect((await request(app).post(`/api/shifts/${s2.body._id}/claim`).set(asStaff())).status).toBe(409);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Admin reassignment with conflict detection
+// ---------------------------------------------------------------------------
+describe('assignments — reassignment', () => {
+  it('blocks reassigning to a staff member who is already booked on an overlapping shift', async () => {
+    const other = await seedStaffUser(admin.company);
+    const createShift = (start, end) =>
+      request(app).post('/api/shifts').set(asAdmin()).send({
+        managerId: admin.user._id.toString(), eventId: event._id.toString(), startTime: start, endTime: end,
+      });
+
+    const s1 = await createShift('2026-07-01T09:00:00.000Z', '2026-07-01T17:00:00.000Z');
+    const s2 = await createShift('2026-07-01T12:00:00.000Z', '2026-07-01T20:00:00.000Z');
+
+    // `other` works s1; `staff` works s2.
+    await request(app).post('/api/assignments').set(asAdmin()).send({ shiftId: s1.body._id, staffId: other._id.toString(), hourlyRate: 10 });
+    const a2 = await request(app).post('/api/assignments').set(asAdmin()).send({ shiftId: s2.body._id, staffId: staff.user._id.toString(), hourlyRate: 10 });
+
+    // Reassigning s2 to `other` would double-book them against s1.
+    const res = await request(app).put(`/api/assignments/${a2.body._id}`).set(asAdmin()).send({ staffId: other._id.toString() });
+    expect(res.status).toBe(409);
   });
 });

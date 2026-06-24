@@ -24,7 +24,7 @@ export default function Login({ onLogin, onSwitchToRegister, onForgotPassword })
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
-          <div className="login-logo-icon">W</div>
+          <div className="login-logo-icon"><span className="material-symbols-outlined" style={{ fontSize: 26, color: '#fff' }}>work</span></div>
           <span className="login-logo-text">WORQR</span>
         </div>
 

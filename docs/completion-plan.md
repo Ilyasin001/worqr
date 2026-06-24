@@ -109,13 +109,17 @@ Owner direction: fix genuinely-broken methods now; bundle authz/endpoint rework
 
 > Demo data: `server/scripts/seed.js` seeds a "Demo Events Co" company (code `DEMO2024`, logins `admin@demo.test` / `sam@demo.test`, password `Password1`). `scripts/dev-memory.js` runs the backend on an in-memory DB when no database is reachable.
 
-### Phase 3 — Core workforce operations (admin ops core DONE 2026-06-22)
+### ✅ Phase 3 — Core workforce operations (DONE 2026-06-22)
 - [x] Event filtering (status/date-range) + search (title/description/address); **capacity** + live `filledCount`; **notes**
 - [x] Shift filtering (eventId/confirmed/date-range)
 - [x] Assignment **status** (assigned→confirmed/declined, admin cancel) + **conflict detection** (no double-booking overlapping shifts)
-- [x] Frontend: event search/filter/capacity/notes, shift filters, assignment status controls
-- [x] Tests: `workforce.integration.test.js` (272 tests total, ~96% coverage)
-- [ ] **Deferred to next round:** staff self-service (claim open shifts, request assignments, swaps/reassignment), recurring shifts, and event attachments (→ Phase 8 file storage)
+- [x] **Recurring shifts** (`repeat: {frequency daily/weekly, count}`, max 60, per-occurrence validation)
+- [x] **Staff self-service**: `GET /shifts/open` + `POST /shifts/:id/claim` (conflict-checked self-assign); swaps via release (decline → reopens) & reclaim; admin **reassignment** re-runs conflict detection
+- [x] Frontend: event search/filter/capacity/notes; shift filters + recurrence option; staff open-shifts + Claim; assignment status controls
+- [x] Tests: `workforce.integration.test.js` (278 tests total, ~96% coverage)
+- [ ] **Deferred:** event attachments (→ Phase 8 file storage); a negotiated peer-to-peer shift-swap UI (release & reclaim covers the need for now)
+
+**Phase 3 is complete.**
 
 ### Phase 4 — Time tracking
 - [ ] Clock in/out, attendance validation, late/no-show handling

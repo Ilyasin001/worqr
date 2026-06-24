@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import mongoose from "mongoose";
 import { connectDB } from "./config/db.js";
 import cors from "cors";
 import helmet from "helmet";
@@ -53,6 +54,18 @@ app.use("/api/companies", companyRoutes);
 // Testing route
 app.get("/", (req, res) => {
   res.send("Hello, World!");
+});
+
+// Health check — reports process liveness and DB connection state. Returns 503
+// while the database is unreachable so load balancers / uptime checks can react.
+app.get("/health", (req, res) => {
+  const states = ["disconnected", "connected", "connecting", "disconnecting"];
+  const db = states[mongoose.connection.readyState] || "unknown";
+  res.status(db === "connected" ? 200 : 503).json({
+    status: db === "connected" ? "ok" : "degraded",
+    db,
+    uptime: process.uptime(),
+  });
 });
 
 app.use(errorHandler);
